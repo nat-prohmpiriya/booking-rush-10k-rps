@@ -1,0 +1,10 @@
+go 1.23
+
+use (
+	./apps/api-gateway
+	./apps/auth-service
+	./apps/ticket-service
+	./apps/booking-service
+	./apps/payment-service
+	./pkg
+)

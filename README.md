@@ -1,135 +1,172 @@
-```bash
-booking-rush-10k-rps/
-  ├── .docs/                          # Documentation
-  │   ├── 01-spec.md
-  │   ├── 02-task.md
-  │   ├── 03-issue.md
-  │   └── 04-prompt-phrase-1.md
-  │
-  ├── apps/                           # Microservices
-  │   ├── api-gateway/
-  │   │   ├── cmd/
-  │   │   │   └── main.go
-  │   │   ├── internal/
-  │   │   │   ├── handler/
-  │   │   │   ├── middleware/
-  │   │   │   └── router/
-  │   │   ├── go.mod
-  │   │   └── Dockerfile
-  │   │
-  │   ├── auth-service/
-  │   │   ├── cmd/
-  │   │   │   └── main.go
-  │   │   ├── internal/
-  │   │   │   ├── domain/
-  │   │   │   ├── handler/
-  │   │   │   ├── repository/
-  │   │   │   └── service/
-  │   │   ├── go.mod
-  │   │   └── Dockerfile
-  │   │
-  │   ├── ticket-service/
-  │   │   ├── cmd/
-  │   │   │   └── main.go
-  │   │   ├── internal/
-  │   │   │   ├── domain/
-  │   │   │   ├── handler/
-  │   │   │   ├── repository/
-  │   │   │   └── service/
-  │   │   ├── go.mod
-  │   │   └── Dockerfile
-  │   │
-  │   ├── booking-service/            # Core service - 10k
-  RPS
-  │   │   ├── cmd/
-  │   │   │   └── main.go
-  │   │   ├── internal/
-  │   │   │   ├── domain/
-  │   │   │   ├── handler/
-  │   │   │   ├── repository/
-  │   │   │   ├── service/
-  │   │   │   └── worker/             # Inventory sync worker
-  │   │   ├── scripts/
-  │   │   │   └── lua/                # Redis Lua scripts
-  │   │   │       ├── reserve_seats.lua
-  │   │   │       ├── release_seats.lua
-  │   │   │       └── confirm_booking.lua
-  │   │   ├── go.mod
-  │   │   └── Dockerfile
-  │   │
-  │   └── payment-service/
-  │       ├── cmd/
-  │       │   └── main.go
-  │       ├── internal/
-  │       │   ├── domain/
-  │       │   ├── handler/
-  │       │   ├── repository/
-  │       │   ├── service/
-  │       │   └── consumer/           # Kafka consumer
-  │       ├── go.mod
-  │       └── Dockerfile
-  │
-  ├── pkg/                            # Shared packages
-  │   ├── config/                     # Configuration loader 
-  (Viper)
-  │   ├── logger/                     # Structured logging 
-  (Zap/Zerolog)
-  │   ├── response/                   # Standard API response
-   wrapper
-  │   ├── errors/                     # Custom error types
-  │   ├── middleware/                 # Common middlewares
-  │   ├── database/                   # PostgreSQL connection
-   (pgx)
-  │   ├── redis/                      # Redis client wrapper
-  │   ├── kafka/                      # Kafka 
-  producer/consumer (segmentio)
-  │   └── telemetry/                  # OpenTelemetry setup
-  │
-  ├── migrations/                     # Database migrations
-  │   ├── 000001_create_tenants.up.sql
-  │   ├── 000001_create_tenants.down.sql
-  │   ├── 000002_create_users.up.sql
-  │   └── ...
-  │
-  ├── scripts/                        # Build/deploy scripts
-  │   ├── migrate.sh
-  │   ├── seed.sh
-  │   └── load-test.sh
-  │
-  ├── tests/                          # Integration & load 
-  tests
-  │   ├── integration/
-  │   └── k6/                         # k6 load test scripts
-  │       └── booking_load_test.js
-  │
-  ├── web/                            # Frontend (Phase 6)
-  │   └── (Next.js 15 project)
-  │
-  ├── docker-compose.yml              # Local development
-  ├── docker-compose.prod.yml         # Production-like
-  ├── go.work                         # Go Workspace
-  ├── Makefile                        # Common commands
-  ├── .env.example
-  ├── .gitignore
-  └── README.md
+# Booking Rush 10k RPS
 
-  สรุปโครงสร้างหลัก
+High-performance ticket booking microservices system designed to handle **10,000 Requests Per Second** without overselling.
 
-  | Directory   | Purpose                               |
-  |-------------|---------------------------------------|
-  | apps/       | Microservices (5 services)            |
-  | pkg/        | Shared packages ใช้ร่วมกันทุก service |
-  | migrations/ | Database schema migrations            |
-  | scripts/    | Utility scripts                       |
-  | tests/      | Integration & load tests              |
-  | web/        | Next.js frontend (Phase 6)            |
+## Tech Stack
 
-  Clean Architecture ใน Service
+| Component | Technology |
+|-----------|------------|
+| Language | Go 1.23 |
+| Framework | Gin |
+| Database | PostgreSQL 16 |
+| Cache | Redis 7 (Lua Scripts) |
+| Message Broker | Kafka |
+| Observability | OpenTelemetry |
 
-  internal/
-  ├── domain/       # Entities, interfaces (ไม่ depend อะไร)
-  ├── service/      # Business logic (depend domain)
-  ├── repository/   # Data access (depend domain)
-  ├── handler/      # HTTP handlers (depend service)
-  └── worker/       # Background workers (ถ้ามี)
+## Architecture
+
 ```
+┌─────────────────────────────────────────────────────────────────┐
+│                         API Gateway                              │
+│                    (Rate Limit, Auth, Routing)                   │
+└─────────────────────────────────────────────────────────────────┘
+                                 │
+        ┌────────────────────────┼────────────────────────┐
+        ▼                        ▼                        ▼
+┌───────────────┐       ┌───────────────┐       ┌───────────────┐
+│  Auth Service │       │ Ticket Service│       │Booking Service│
+│   (JWT Auth)  │       │ (Events/Shows)│       │ (10k RPS Core)│
+└───────────────┘       └───────────────┘       └───────┬───────┘
+                                                        │
+                                                        ▼ Kafka
+                                                ┌───────────────┐
+                                                │Payment Service│
+                                                │   (Consumer)  │
+                                                └───────────────┘
+```
+
+## Quick Start
+
+### Prerequisites
+
+- Go 1.23+
+- Docker & Docker Compose
+- Make
+
+### Start Infrastructure
+
+```bash
+# Start PostgreSQL, Redis, Kafka, and monitoring tools
+make dev
+
+# Check running services
+make ps
+```
+
+### Services Available
+
+| Service | URL |
+|---------|-----|
+| PostgreSQL | localhost:5432 |
+| Redis | localhost:6379 |
+| Kafka | localhost:9093 |
+| Kafka UI | http://localhost:8080 |
+| Redis Commander | http://localhost:8081 |
+
+### Run Migrations
+
+```bash
+# Install golang-migrate
+go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+
+# Run migrations
+make migrate-up
+```
+
+### Run Services
+
+```bash
+# Run individual services
+make run-gateway
+make run-auth
+make run-ticket
+make run-booking
+make run-payment
+```
+
+## Project Structure
+
+```
+booking-rush-10k-rps/
+├── apps/                   # Microservices
+│   ├── api-gateway/        # Entry point, routing, rate limiting
+│   ├── auth-service/       # JWT authentication
+│   ├── ticket-service/     # Event & show management
+│   ├── booking-service/    # Core booking (Redis Lua + Kafka)
+│   └── payment-service/    # Payment processing (Kafka consumer)
+│
+├── pkg/                    # Shared packages
+│   ├── config/             # Configuration (Viper)
+│   ├── logger/             # Structured logging (Zap)
+│   ├── response/           # API response wrapper
+│   ├── errors/             # Custom error types
+│   ├── middleware/         # Common middlewares
+│   ├── database/           # PostgreSQL (pgx)
+│   ├── redis/              # Redis client
+│   ├── kafka/              # Kafka producer/consumer
+│   └── telemetry/          # OpenTelemetry setup
+│
+├── migrations/             # Database migrations
+├── scripts/                # Utility scripts
+├── tests/                  # Integration & load tests
+│   ├── integration/
+│   └── k6/                 # k6 load test scripts
+│
+├── web/                    # Frontend (Next.js 15)
+├── docker-compose.yml      # Local development
+├── go.work                 # Go Workspace
+└── Makefile                # Common commands
+```
+
+## Make Commands
+
+```bash
+make help           # Show all commands
+
+# Docker
+make dev            # Start infrastructure
+make down           # Stop infrastructure
+make logs           # View logs
+
+# Go
+make build          # Build all services
+make test           # Run tests
+make lint           # Run linter
+
+# Database
+make migrate-up     # Run migrations
+make migrate-down   # Rollback migration
+make migrate-create name=xxx  # Create new migration
+
+# Load Testing
+make load-test      # Run k6 load test
+```
+
+## Key Features
+
+- **10k RPS Booking**: Redis Lua scripts for atomic seat reservation
+- **Zero Overselling**: Atomic operations prevent race conditions
+- **Event-Driven**: Kafka for async processing
+- **Rate Limiting**: Token Bucket with burst support
+- **Virtual Queue**: Waiting room for flash sales
+- **Observability**: OpenTelemetry with Jaeger, Prometheus, Grafana
+
+## Documentation
+
+- [Specification](.docs/01-spec.md)
+- [Development Roadmap](.docs/02-task.md)
+- [Known Issues](.docs/03-issue.md)
+
+## Performance Targets
+
+| Metric | Target |
+|--------|--------|
+| RPS (Reserve endpoint) | 10,000 |
+| Server P99 Latency | < 50ms |
+| E2E P99 Latency | < 200ms |
+| Error Rate | < 0.1% |
+| Overselling | 0 |
+
+## License
+
+MIT
