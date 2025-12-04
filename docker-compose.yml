@@ -1,186 +1,97 @@
 version: '3.8'
 
-# =============================================================================
-# Booking Rush - Development Infrastructure
-# =============================================================================
-# Using existing containers (ragagent):
-#   - PostgreSQL: localhost:5432 (ragagent-postgres)
-#   - Redis: localhost:6379 (ragagent-redis)
-#   - Jaeger: localhost:16686 (ragagent-jaeger) - OTLP 4317/4318
-#
-# This compose includes:
-#   - Kafka (KRaft mode - no Zookeeper)
-#   - Observability stack (Prometheus, Loki, Grafana)
-#   - OTel Collector (uses different ports, exports to existing Jaeger)
-# =============================================================================
-
 services:
-  # =============================================================================
-  # Kafka - KRaft Mode (No Zookeeper)
-  # =============================================================================
-  kafka:
-    image: bitnami/kafka:3.7
-    container_name: booking-rush-kafka
-    restart: unless-stopped
+  postgres:
+    image: postgres:16-alpine
+    container_name: booking_postgres
     environment:
-      # KRaft settings
-      KAFKA_CFG_NODE_ID: 1
-      KAFKA_CFG_PROCESS_ROLES: broker,controller
-      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 1@kafka:9094
-      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      # Listeners
-      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9094,EXTERNAL://:9093
-      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:9093
-      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
-      KAFKA_CFG_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-      # Topic settings
-      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: "true"
-      KAFKA_CFG_NUM_PARTITIONS: 3
-      KAFKA_CFG_DEFAULT_REPLICATION_FACTOR: 1
-      KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-      KAFKA_CFG_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      ALLOW_PLAINTEXT_LISTENER: "yes"
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-booking_rush}
     ports:
-      - "9093:9093"
+      - "5432:5432"
     volumes:
-      - kafka_data:/bitnami/kafka
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "kafka-topics.sh --bootstrap-server localhost:9092 --list"]
-      interval: 30s
-      timeout: 10s
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
       retries: 5
     networks:
       - booking-network
 
-  # =============================================================================
-  # Kafka UI - Monitoring
-  # =============================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: booking_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - booking-network
+
+  zookeeper:
+    image: bitnami/zookeeper:latest
+    container_name: booking_zookeeper
+    environment:
+      ALLOW_ANONYMOUS_LOGIN: "yes"
+    ports:
+      - "2181:2181"
+    networks:
+      - booking-network
+
+  kafka:
+    image: bitnami/kafka:latest
+    container_name: booking_kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_CFG_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092
+      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      ALLOW_PLAINTEXT_LISTENER: "yes"
+    depends_on:
+      - zookeeper
+    networks:
+      - booking-network
+
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
-    container_name: booking-rush-kafka-ui
-    restart: unless-stopped
+    container_name: booking_kafka_ui
+    ports:
+      - "8081:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
     depends_on:
       - kafka
+    networks:
+      - booking-network
+
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: booking_redis_commander
     environment:
-      KAFKA_CLUSTERS_0_NAME: booking-rush-cluster
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      REDIS_HOSTS: local:redis:6379
     ports:
-      - "8082:8080"
-    networks:
-      - booking-network
-
-  # =============================================================================
-  # OpenTelemetry Collector
-  # =============================================================================
-  # Note: Uses ports 4327/4328 instead of 4317/4318 (ragagent-jaeger uses those)
-  # Go services should send OTLP to localhost:4327 (gRPC) or localhost:4328 (HTTP)
-  # =============================================================================
-  otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.96.0
-    container_name: booking-rush-otel-collector
-    restart: unless-stopped
-    command: ["--config=/etc/otel-collector-config.yaml"]
-    volumes:
-      - ./infra/otel/otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
-    ports:
-      - "4327:4317"   # OTLP gRPC (mapped to 4327 to avoid conflict)
-      - "4328:4318"   # OTLP HTTP (mapped to 4328 to avoid conflict)
-      - "8888:8888"   # Prometheus metrics (self)
-      - "8889:8889"   # Prometheus exporter
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - "8082:8081"
     depends_on:
-      - loki
+      - redis
     networks:
       - booking-network
 
-  # =============================================================================
-  # Jaeger - Distributed Tracing (DISABLED - using existing ragagent-jaeger)
-  # =============================================================================
-  # Uncomment if you need a separate Jaeger instance
-  # jaeger:
-  #   image: jaegertracing/all-in-one:1.54
-  #   container_name: booking-rush-jaeger
-  #   restart: unless-stopped
-  #   environment:
-  #     COLLECTOR_OTLP_ENABLED: "true"
-  #   ports:
-  #     - "16686:16686"  # Jaeger UI
-  #     - "14250:14250"  # gRPC
-  #   networks:
-  #     - booking-network
-
-  # =============================================================================
-  # Prometheus - Metrics
-  # =============================================================================
-  prometheus:
-    image: prom/prometheus:v2.50.1
-    container_name: booking-rush-prometheus
-    restart: unless-stopped
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--storage.tsdb.retention.time=7d'
-      - '--web.enable-lifecycle'
-    volumes:
-      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus_data:/prometheus
-    ports:
-      - "9090:9090"
-    networks:
-      - booking-network
-
-  # =============================================================================
-  # Loki - Log Aggregation
-  # =============================================================================
-  loki:
-    image: grafana/loki:2.9.4
-    container_name: booking-rush-loki
-    restart: unless-stopped
-    command: -config.file=/etc/loki/loki-config.yaml
-    volumes:
-      - ./infra/loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro
-      - loki_data:/loki
-    ports:
-      - "3100:3100"
-    networks:
-      - booking-network
-
-  # =============================================================================
-  # Grafana - Visualization
-  # =============================================================================
-  grafana:
-    image: grafana/grafana:10.3.3
-    container_name: booking-rush-grafana
-    restart: unless-stopped
-    environment:
-      GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: admin
-      GF_USERS_ALLOW_SIGN_UP: "false"
-    volumes:
-      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
-      - grafana_data:/var/lib/grafana
-    ports:
-      - "3001:3000"
-    depends_on:
-      - prometheus
-      - loki
-    networks:
-      - booking-network
-
-# =============================================================================
-# Networks
-# =============================================================================
 networks:
   booking-network:
     driver: bridge
 
-# =============================================================================
-# Volumes
-# =============================================================================
 volumes:
-  kafka_data:
-  prometheus_data:
-  loki_data:
-  grafana_data:
+  postgres_data:
+  redis_data:

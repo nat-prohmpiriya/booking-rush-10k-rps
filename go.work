@@ -1,10 +1,12 @@
-go 1.23
+go 1.23.0
+
+toolchain go1.23.4
 
 use (
 	./apps/api-gateway
 	./apps/auth-service
-	./apps/ticket-service
 	./apps/booking-service
 	./apps/payment-service
+	./apps/ticket-service
 	./pkg
 )
