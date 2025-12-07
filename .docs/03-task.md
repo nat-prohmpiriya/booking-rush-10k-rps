@@ -146,38 +146,38 @@
 
 ---
 
-### [ ]  P1-09: Database Migrations - Core Tables
+### [x]  P1-09: Database Migrations - Core Tables
 | Field | Value |
 |-------|-------|
 | **Description** | สร้าง SQL migrations สำหรับ core tables |
 | **Technical Context** | `scripts/migrations/000001_*.sql` |
 | **Acceptance Criteria** | - Migration up/down ทำงานได้<br>- Tables: tenants, users, categories, events, shows, seat_zones<br>- Indexes created |
 
-- [ ] Create `000001_create_tenants.up.sql`
-- [ ] Create `000001_create_tenants.down.sql`
-- [ ] Create `000002_create_users.up.sql`
-- [ ] Create `000003_create_categories.up.sql`
-- [ ] Create `000004_create_events.up.sql`
-- [ ] Create `000005_create_shows.up.sql`
-- [ ] Create `000006_create_seat_zones.up.sql`
-- [ ] Add all required indexes
-- [ ] Test migrations up and down
+- [x] Create `000001_create_tenants.up.sql`
+- [x] Create `000001_create_tenants.down.sql`
+- [x] Create `000002_create_users.up.sql`
+- [x] Create `000003_create_categories.up.sql`
+- [x] Create `000004_create_events.up.sql`
+- [x] Create `000005_create_shows.up.sql`
+- [x] Create `000006_create_seat_zones.up.sql`
+- [x] Add all required indexes
+- [x] Test migrations up and down
 
 ---
 
-### [ ]  P1-10: Database Migrations - Booking Tables
+### [x]  P1-10: Database Migrations - Booking Tables
 | Field | Value |
 |-------|-------|
 | **Description** | สร้าง SQL migrations สำหรับ booking และ payment tables |
 | **Technical Context** | `scripts/migrations/000007_*.sql` |
 | **Acceptance Criteria** | - Tables: bookings, payments, outbox, audit_logs<br>- Partitioned audit_logs table<br>- All indexes created |
 
-- [ ] Create `000007_create_bookings.up.sql`
-- [ ] Create `000008_create_payments.up.sql`
-- [ ] Create `000009_create_outbox.up.sql`
-- [ ] Create `000010_create_audit_logs.up.sql` (partitioned)
-- [ ] Create partition for current month
-- [ ] Test migrations
+- [x] Create `000007_create_bookings.up.sql`
+- [x] Create `000008_create_payments.up.sql`
+- [x] Create `000009_create_outbox.up.sql`
+- [x] Create `000010_create_audit_logs.up.sql` (partitioned)
+- [x] Create partition for current month
+- [x] Test migrations
 
 ---
 
