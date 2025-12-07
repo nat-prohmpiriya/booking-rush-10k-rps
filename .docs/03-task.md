@@ -181,21 +181,21 @@
 
 ---
 
-### [ ]  P1-11: API Gateway - Basic Setup
+### [x]  P1-11: API Gateway - Basic Setup
 | Field | Value |
 |-------|-------|
 | **Description** | Setup API Gateway ด้วย Gin framework |
 | **Technical Context** | `apps/api-gateway/main.go`, `apps/api-gateway/internal/` |
 | **Acceptance Criteria** | - Server starts on :8080<br>- `/health` returns 200<br>- `/ready` checks DB & Redis |
 
-- [ ] Create `main.go` entry point
-- [ ] Setup Gin router
-- [ ] Implement `/health` endpoint
-- [ ] Implement `/ready` endpoint (checks dependencies)
-- [ ] Add request ID middleware
-- [ ] Add logging middleware
-- [ ] Add CORS middleware
-- [ ] Write tests
+- [x] Create `main.go` entry point
+- [x] Setup Gin router
+- [x] Implement `/health` endpoint
+- [x] Implement `/ready` endpoint (checks dependencies)
+- [x] Add request ID middleware
+- [x] Add logging middleware
+- [x] Add CORS middleware
+- [x] Write tests
 
 ---
 
