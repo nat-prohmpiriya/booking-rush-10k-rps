@@ -7,7 +7,12 @@
       "Bash(lsof:*)",
       "Bash(docker exec:*)",
       "Bash(test:*)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(nc:*)",
+      "Bash(for port in 9000 9001 9002 9090 443 80)",
+      "Bash(do nc -zv 100.104.0.42 $port)",
+      "Bash(done)",
+      "Bash(ssh:*)"
     ],
     "deny": [],
     "ask": []
