@@ -127,3 +127,5 @@ tests/load/results/
 
 # Generated documentation
 docs/api/generated/
+
+CLAUDE.md

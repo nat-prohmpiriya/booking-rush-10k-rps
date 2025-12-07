@@ -1,0 +1,4 @@
+packages:
+  - "apps/notification-service"
+  - "apps/analytics-service"
+  - "apps/web"
