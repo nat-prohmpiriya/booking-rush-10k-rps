@@ -131,18 +131,18 @@
 
 ---
 
-### [ ]  P1-08: Shared Package - Redis Client
+### [x]  P1-08: Shared Package - Redis Client
 | Field | Value |
 |-------|-------|
 | **Description** | สร้าง Redis client wrapper |
 | **Technical Context** | `pkg/redis/redis.go` |
 | **Acceptance Criteria** | - Connect to Redis ได้<br>- Execute Lua scripts ได้<br>- Health check function |
 
-- [ ] Create Redis client with go-redis/v9
-- [ ] Implement `EvalSha` for Lua scripts
-- [ ] Add `Ping()` health check
-- [ ] Add script loading utility
-- [ ] Write integration tests
+- [x] Create Redis client with go-redis/v9
+- [x] Implement `EvalSha` for Lua scripts
+- [x] Add `Ping()` health check
+- [x] Add script loading utility
+- [x] Write integration tests
 
 ---
 
