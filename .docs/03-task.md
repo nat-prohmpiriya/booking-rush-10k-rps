@@ -199,36 +199,36 @@
 
 ---
 
-### [ ]  P1-12: Makefile Commands
+### [x]  P1-12: Makefile Commands
 | Field | Value |
 |-------|-------|
 | **Description** | สร้าง Makefile สำหรับ common commands |
 | **Technical Context** | `Makefile` |
 | **Acceptance Criteria** | - `make dev` starts infrastructure<br>- `make migrate-up` runs migrations<br>- `make test` runs all tests |
 
-- [ ] Add `dev` command (docker-compose up)
-- [ ] Add `dev-down` command
-- [ ] Add `migrate-up` and `migrate-down`
-- [ ] Add `test` command
-- [ ] Add `build` command for all services
-- [ ] Add `lint` command
+- [x] Add `dev` command (docker-compose up)
+- [x] Add `dev-down` command
+- [x] Add `migrate-up` and `migrate-down`
+- [x] Add `test` command
+- [x] Add `build` command for all services
+- [x] Add `lint` command
 
 ---
 
-### [ ]  P1-13: Basic OTel Setup (Early Observability)
+### [x]  P1-13: Basic OTel Setup (Early Observability)
 | Field | Value |
 |-------|-------|
 | **Description** | Setup basic OpenTelemetry tracing ตั้งแต่ Phase 1 เพื่อใช้ debug race conditions และ performance ใน Phase 2+ |
 | **Technical Context** | `pkg/telemetry/`, `infra/otel/`, `docker-compose.yml` |
 | **Acceptance Criteria** | - OTel Collector running in Docker<br>- Jaeger accessible for traces<br>- Basic tracing middleware พร้อมใช้<br>- Trace ID appears in logs |
 
-- [ ] Add OTel Collector to docker-compose.yml
-- [ ] Add Jaeger to docker-compose.yml (all-in-one image)
-- [ ] Create basic `pkg/telemetry/tracer.go` with TracerProvider
-- [ ] Inject trace_id into Zap logger context
-- [ ] Create Gin middleware for auto-tracing
-- [ ] Document how to view traces in Jaeger UI
-- [ ] Test trace propagation works
+- [-] Add OTel Collector to docker-compose.yml *(skipped - using remote 100.104.0.42:4317)*
+- [-] Add Jaeger to docker-compose.yml *(skipped - using Grafana Tempo on 49.12.47.41)*
+- [x] Create basic `pkg/telemetry/tracer.go` with TracerProvider
+- [x] Inject trace_id into Zap logger context *(via middleware)*
+- [x] Create Gin middleware for auto-tracing
+- [x] Document how to view traces in Jaeger UI *(Grafana: 49.12.47.41:3000)*
+- [x] Test trace propagation works
 
 ---
 
