@@ -240,19 +240,19 @@
 
 **Goal:** Achieve 10,000 RPS on booking endpoint with zero overselling
 
-### [ ]  P2-01: Redis Lua Script - Reserve Seats
+### [x]  P2-01: Redis Lua Script - Reserve Seats
 | Field | Value |
 |-------|-------|
 | **Description** | เขียน Lua script สำหรับ atomic seat reservation |
 | **Technical Context** | `scripts/lua/reserve_seats.lua` |
 | **Acceptance Criteria** | - Check seat availability atomically<br>- Check user max limit per event<br>- Deduct seats and set TTL<br>- Return remaining count or error |
 
-- [ ] Implement availability check logic
-- [ ] Implement user limit check
-- [ ] Implement atomic DECRBY
-- [ ] Set reservation TTL (10 min)
-- [ ] Return structured response (success/error + remaining)
-- [ ] Write Lua script tests
+- [x] Implement availability check logic
+- [x] Implement user limit check
+- [x] Implement atomic DECRBY
+- [x] Set reservation TTL (10 min)
+- [x] Return structured response (success/error + remaining)
+- [x] Write Lua script tests
 
 ---
 

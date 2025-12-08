@@ -7,4 +7,5 @@ use (
 	./apps/payment-service
 	./apps/ticket-service
 	./pkg
+	./scripts
 )
