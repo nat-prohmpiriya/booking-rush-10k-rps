@@ -455,24 +455,24 @@
 
 ---
 
-### [ ]  P2-14: Thundering Herd Rejection Efficiency
+### [x]  P2-14: Thundering Herd Rejection Efficiency
 | Field | Value |
 |-------|-------|
 | **Description** | ตรวจสอบว่า Booking Service ปฏิเสธ requests เกินกำลังได้อย่างมีประสิทธิภาพ (ก่อน Virtual Queue พร้อมใน Phase 6) |
 | **Technical Context** | `apps/booking-service/`, `apps/api-gateway/` |
 | **Acceptance Criteria** | - 429 responses returned < 5ms<br>- No resource exhaustion under 20k RPS spike<br>- Error messages เข้าใจง่ายสำหรับ client |
 
-- [ ] Test API Gateway rate limiting under 20k RPS
+- [x] Test API Gateway rate limiting under 20k RPS
   - Verify: 429 responses fast (< 5ms)
   - Verify: X-RateLimit headers correct
   - Verify: Retry-After header present
-- [ ] Test Booking Service rejection when sold out
+- [x] Test Booking Service rejection when sold out
   - Verify: Lua script returns immediately (< 1ms)
   - Verify: No DB connections used for rejections
-- [ ] Monitor resource usage under rejection load
+- [x] Monitor resource usage under rejection load
   - Verify: CPU/Memory stable
   - Verify: No goroutine leaks
-- [ ] Create client-side retry guidelines doc
+- [x] Create client-side retry guidelines doc
   - Document: Exponential backoff strategy
   - Document: When to stop retrying
 
@@ -486,17 +486,17 @@
 
 **Goal:** Complete auth flow and event management
 
-### [ ]  P3-01: Auth Service - Project Structure
+### [x]  P3-01: Auth Service - Project Structure
 | Field | Value |
 |-------|-------|
 | **Description** | Setup Auth Service structure |
 | **Technical Context** | `apps/auth-service/internal/` |
 | **Acceptance Criteria** | - Clean Architecture layers<br>- Service starts on :8081<br>- Health check works |
 
-- [ ] Create project structure (handler, service, repository, domain)
-- [ ] Setup dependency injection
-- [ ] Create `main.go`
-- [ ] Add health check endpoint
+- [x] Create project structure (handler, service, repository, domain)
+- [x] Setup dependency injection
+- [x] Create `main.go`
+- [x] Add health check endpoint
 
 ---
 
@@ -1569,6 +1569,154 @@
 | Phase 8: Observability | 8 | 0 |
 | Phase 9: Production | 6 | 0 |
 | **Total** | **93** | **0** |
+
+---
+
+## Phase 10: Admin UI
+
+**Goal:** Admin dashboard for event organizers to manage events, zones, and monitor sales
+
+### [ ]  P10-01: Admin UI - Project Setup
+| Field | Value |
+|-------|-------|
+| **Description** | Setup Next.js admin dashboard project |
+| **Technical Context** | `apps/admin/` |
+| **Acceptance Criteria** | - Next.js 15 with App Router<br>- TailwindCSS + Shadcn UI<br>- Authentication (admin-only)<br>- Basic layout with sidebar |
+
+- [ ] Create Next.js project for admin
+- [ ] Configure TailwindCSS and Shadcn UI
+- [ ] Implement admin authentication
+- [ ] Create admin layout with sidebar navigation
+- [ ] Setup API client with auth interceptor
+
+---
+
+### [ ]  P10-02: Admin UI - Event Management
+| Field | Value |
+|-------|-------|
+| **Description** | CRUD interface for managing events |
+| **Technical Context** | `apps/admin/app/events/` |
+| **Acceptance Criteria** | - Event list with search/filter<br>- Create new event form<br>- Edit event form<br>- Delete event (soft delete) |
+
+- [ ] Create event list page with DataTable
+- [ ] Implement search and filter functionality
+- [ ] Create new event form with validation
+- [ ] Create edit event page
+- [ ] Implement delete with confirmation modal
+- [ ] Add event image upload (MinIO)
+
+---
+
+### [ ]  P10-03: Admin UI - Zone Management
+| Field | Value |
+|-------|-------|
+| **Description** | Interface for managing zones within events/shows |
+| **Technical Context** | `apps/admin/app/events/[id]/zones/` |
+| **Acceptance Criteria** | - Zone list per event/show<br>- Create zone with: name, capacity, price<br>- Edit zone details<br>- Real-time availability display |
+
+- [ ] Create zone list page for event/show
+- [ ] Implement create zone form
+- [ ] Implement edit zone form
+- [ ] Display real-time availability from Redis
+- [ ] Add zone reordering (display order)
+
+---
+
+### [ ]  P10-04: Admin UI - Visual Seat Map Builder (Optional)
+| Field | Value |
+|-------|-------|
+| **Description** | Visual tool for creating seat maps |
+| **Technical Context** | `apps/admin/app/events/[id]/seat-map/` |
+| **Acceptance Criteria** | - Drag-and-drop zone placement<br>- Set zone shapes and positions<br>- Preview seat map<br>- Export as JSON |
+
+- [ ] Create canvas-based seat map editor
+- [ ] Implement zone shape drawing (rectangle, polygon)
+- [ ] Add zone labeling and coloring
+- [ ] Implement save/load seat map
+- [ ] Preview mode for customers view
+
+---
+
+### [ ]  P10-05: Admin UI - Sales Dashboard
+| Field | Value |
+|-------|-------|
+| **Description** | Real-time sales monitoring dashboard |
+| **Technical Context** | `apps/admin/app/dashboard/` |
+| **Acceptance Criteria** | - Total sales overview<br>- Sales by event/zone<br>- Real-time booking stream<br>- Revenue charts |
+
+- [ ] Create dashboard overview page
+- [ ] Display total sales metrics
+- [ ] Show sales breakdown by event
+- [ ] Add real-time booking feed (WebSocket/SSE)
+- [ ] Implement revenue charts (daily/weekly/monthly)
+
+---
+
+### [ ]  P10-06: Admin UI - Booking Management
+| Field | Value |
+|-------|-------|
+| **Description** | View and manage bookings |
+| **Technical Context** | `apps/admin/app/bookings/` |
+| **Acceptance Criteria** | - Booking list with filters<br>- View booking details<br>- Manual booking actions (cancel, refund)<br>- Export bookings to CSV |
+
+- [ ] Create booking list with DataTable
+- [ ] Implement filters (status, date, event)
+- [ ] Create booking detail view
+- [ ] Implement cancel booking action
+- [ ] Implement refund action
+- [ ] Add export to CSV functionality
+
+---
+
+### [ ]  P10-07: Admin UI - User Management
+| Field | Value |
+|-------|-------|
+| **Description** | Manage users and their roles |
+| **Technical Context** | `apps/admin/app/users/` |
+| **Acceptance Criteria** | - User list with search<br>- View user details and bookings<br>- Change user roles<br>- Suspend/unsuspend users |
+
+- [ ] Create user list page
+- [ ] Implement user search
+- [ ] Create user detail page with booking history
+- [ ] Implement role management
+- [ ] Add suspend/unsuspend functionality
+
+---
+
+### [ ]  P10-08: Admin UI - Event Open/Close Sales
+| Field | Value |
+|-------|-------|
+| **Description** | Control when events are available for booking |
+| **Technical Context** | `apps/admin/app/events/[id]/sales/` |
+| **Acceptance Criteria** | - Set sale start/end datetime<br>- Manual open/close sales toggle<br>- Schedule sale windows<br>- Emergency stop sales button |
+
+- [ ] Create sales control panel
+- [ ] Implement sale start/end datetime picker
+- [ ] Add manual open/close toggle
+- [ ] Implement scheduled sale windows
+- [ ] Add emergency "Stop Sales" button with confirmation
+
+---
+
+**Phase 10 Milestone:** Admin UI operational for event organizers to create events, manage zones, and monitor sales
+
+---
+
+## Progress Summary
+
+| Phase | Tasks | Completed |
+|-------|-------|-----------|
+| Phase 1: Foundation | 13 | 12 |
+| Phase 2: Core Booking | 14 | 14 |
+| Phase 3: Auth & Events | 14 | 0 |
+| Phase 4: Payment & Saga | 12 | 0 |
+| Phase 5: NestJS Services | 8 | 0 |
+| Phase 6: Virtual Queue | 7 | 0 |
+| Phase 7: Frontend | 11 | 0 |
+| Phase 8: Observability | 8 | 0 |
+| Phase 9: Production | 6 | 0 |
+| Phase 10: Admin UI | 8 | 0 |
+| **Total** | **101** | **26** |
 
 ---
 
