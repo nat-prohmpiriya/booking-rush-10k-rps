@@ -16,7 +16,14 @@
       "Bash(go mod init:*)",
       "Bash(go work sync:*)",
       "Bash(go get:*)",
-      "Bash(go mod tidy:*)"
+      "Bash(go mod tidy:*)",
+      "Bash(cat:*)",
+      "Bash(INTEGRATION_TEST=true TEST_REDIS_HOST=100.104.0.42 go test:*)",
+      "Bash(go build:*)",
+      "Bash(timeout 5 go run:*)",
+      "Bash(curl:*)",
+      "Bash(go test:*)",
+      "Bash(go version:*)"
     ],
     "deny": [],
     "ask": []

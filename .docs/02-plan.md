@@ -97,7 +97,7 @@
 | **Cache/Lock** | Redis 7 + Lua | Atomic operations, sub-ms latency |
 | **Message Queue** | Redpanda | Kafka-compatible, faster, less resource usage |
 | **Container** | Docker, Docker Compose | Easy local development |
-| **Monitoring** | Prometheus, Grafana, Jaeger | Industry standard observability |
+| **Monitoring** | Prometheus, Grafana, Tempo | Industry standard observability |
 
 ### 1.4 Service Responsibilities
 
@@ -592,7 +592,7 @@ service/
 | MongoDB | MongoDB 7 | Analytics/Notifications |
 | Redis | Redis 7 | Cache, Locks, Queue |
 | Message Queue | Redpanda | Event streaming |
-| Tracing | Jaeger | Distributed tracing |
+| Tracing | Tempo | Distributed tracing |
 | Metrics | Prometheus | Metrics collection |
 | Logs | Loki | Log aggregation |
 | Visualization | Grafana | Dashboards |
@@ -818,7 +818,7 @@ Content-Security-Policy: default-src 'self'
         |                 |                 |
         v                 v                 v
 +---------------+ +---------------+ +---------------+
-|    Jaeger     | |  Prometheus   | |     Loki      |
+|    Tempo      | |  Prometheus   | |     Loki      |
 |   (Traces)    | |  (Metrics)    | |    (Logs)     |
 +-------+-------+ +-------+-------+ +-------+-------+
         |                 |                 |

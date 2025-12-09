@@ -220,14 +220,14 @@
 |-------|-------|
 | **Description** | Setup basic OpenTelemetry tracing ตั้งแต่ Phase 1 เพื่อใช้ debug race conditions และ performance ใน Phase 2+ |
 | **Technical Context** | `pkg/telemetry/`, `infra/otel/`, `docker-compose.yml` |
-| **Acceptance Criteria** | - OTel Collector running in Docker<br>- Jaeger accessible for traces<br>- Basic tracing middleware พร้อมใช้<br>- Trace ID appears in logs |
+| **Acceptance Criteria** | - OTel Collector running on remote server<br>- Grafana Tempo accessible for traces<br>- Basic tracing middleware พร้อมใช้<br>- Trace ID appears in logs |
 
 - [-] Add OTel Collector to docker-compose.yml *(skipped - using remote 100.104.0.42:4317)*
-- [-] Add Jaeger to docker-compose.yml *(skipped - using Grafana Tempo on 49.12.47.41)*
+- [-] Add Tempo to docker-compose.yml *(skipped - using Grafana Tempo on 49.12.47.41)*
 - [x] Create basic `pkg/telemetry/tracer.go` with TracerProvider
 - [x] Inject trace_id into Zap logger context *(via middleware)*
 - [x] Create Gin middleware for auto-tracing
-- [x] Document how to view traces in Jaeger UI *(Grafana: 49.12.47.41:3000)*
+- [x] Document how to view traces in Grafana Tempo *(Grafana: 49.12.47.41:3000)*
 - [x] Test trace propagation works
 
 ---
@@ -256,130 +256,130 @@
 
 ---
 
-### [ ]  P2-02: Redis Lua Script - Release Seats
+### [x]  P2-02: Redis Lua Script - Release Seats
 | Field | Value |
 |-------|-------|
 | **Description** | เขียน Lua script สำหรับ release seats กลับ inventory |
 | **Technical Context** | `scripts/lua/release_seats.lua` |
 | **Acceptance Criteria** | - Increment seat count atomically<br>- Delete reservation key<br>- Update user reserved count |
 
-- [ ] Implement atomic INCRBY
-- [ ] Delete reservation record
-- [ ] Update user's reserved count
-- [ ] Write tests
+- [x] Implement atomic INCRBY
+- [x] Delete reservation record
+- [x] Update user's reserved count
+- [x] Write tests
 
 ---
 
-### [ ]  P2-03: Redis Lua Script - Confirm Booking
+### [x]  P2-03: Redis Lua Script - Confirm Booking
 | Field | Value |
 |-------|-------|
 | **Description** | เขียน Lua script สำหรับ confirm booking |
 | **Technical Context** | `scripts/lua/confirm_booking.lua` |
 | **Acceptance Criteria** | - Validate reservation exists<br>- Mark as confirmed<br>- Remove TTL |
 
-- [ ] Check reservation exists and not expired
-- [ ] Update reservation status
-- [ ] Remove TTL (permanent)
-- [ ] Write tests
+- [x] Check reservation exists and not expired
+- [x] Update reservation status
+- [x] Remove TTL (permanent)
+- [x] Write tests
 
 ---
 
-### [ ]  P2-04: Booking Service - Project Structure
+### [x]  P2-04: Booking Service - Project Structure
 | Field | Value |
 |-------|-------|
 | **Description** | สร้าง Clean Architecture structure สำหรับ Booking Service |
 | **Technical Context** | `apps/booking-service/internal/` |
 | **Acceptance Criteria** | - Layers: handler, service, repository, domain<br>- Dependency injection setup<br>- Service starts without error |
 
-- [ ] Create `internal/handler/` directory
-- [ ] Create `internal/service/` directory
-- [ ] Create `internal/repository/` directory
-- [ ] Create `internal/domain/` directory
-- [ ] Create `internal/dto/` directory
-- [ ] Setup dependency injection
-- [ ] Create `main.go`
+- [x] Create `internal/handler/` directory
+- [x] Create `internal/service/` directory
+- [x] Create `internal/repository/` directory
+- [x] Create `internal/domain/` directory
+- [x] Create `internal/dto/` directory
+- [x] Setup dependency injection
+- [x] Create `main.go`
 
 ---
 
-### [ ]  P2-05: Booking Service - Domain Models
+### [x]  P2-05: Booking Service - Domain Models
 | Field | Value |
 |-------|-------|
 | **Description** | สร้าง domain entities สำหรับ booking |
 | **Technical Context** | `apps/booking-service/internal/domain/booking.go` |
 | **Acceptance Criteria** | - Booking entity with all fields<br>- Status enum (reserved, confirmed, cancelled, expired)<br>- Validation methods |
 
-- [ ] Create `Booking` struct
-- [ ] Create `BookingStatus` enum
-- [ ] Create `Reservation` struct (Redis)
-- [ ] Add validation methods
-- [ ] Write tests
+- [x] Create `Booking` struct
+- [x] Create `BookingStatus` enum
+- [x] Create `Reservation` struct (Redis)
+- [x] Add validation methods
+- [x] Write tests
 
 ---
 
-### [ ]  P2-06: Booking Service - Repository Layer
+### [x]  P2-06: Booking Service - Repository Layer
 | Field | Value |
 |-------|-------|
 | **Description** | Implement repository สำหรับ PostgreSQL และ Redis |
 | **Technical Context** | `apps/booking-service/internal/repository/` |
 | **Acceptance Criteria** | - PostgreSQL CRUD operations<br>- Redis Lua script execution<br>- Transaction support |
 
-- [ ] Create `BookingRepository` interface
-- [ ] Implement `PostgresBookingRepository`
-- [ ] Create `RedisRepository` interface
-- [ ] Implement `RedisInventoryRepository`
-- [ ] Implement `ReserveSeats()` using Lua
-- [ ] Implement `ReleaseSeats()` using Lua
-- [ ] Write integration tests
+- [x] Create `BookingRepository` interface
+- [x] Implement `PostgresBookingRepository`
+- [x] Create `RedisRepository` interface
+- [x] Implement `RedisInventoryRepository`
+- [x] Implement `ReserveSeats()` using Lua
+- [x] Implement `ReleaseSeats()` using Lua
+- [x] Write integration tests
 
 ---
 
-### [ ]  P2-07: Booking Service - Service Layer
+### [x]  P2-07: Booking Service - Service Layer
 | Field | Value |
 |-------|-------|
 | **Description** | Implement business logic สำหรับ booking |
 | **Technical Context** | `apps/booking-service/internal/service/booking_service.go` |
 | **Acceptance Criteria** | - Reserve seats with idempotency<br>- Confirm booking<br>- Cancel booking<br>- List user bookings |
 
-- [ ] Create `BookingService` struct
-- [ ] Implement `ReserveSeats()` with idempotency key
-- [ ] Implement `ConfirmBooking()`
-- [ ] Implement `CancelBooking()`
-- [ ] Implement `GetUserBookings()`
-- [ ] Implement `GetPendingBookings()`
-- [ ] Write unit tests with mocks
+- [x] Create `BookingService` struct
+- [x] Implement `ReserveSeats()` with idempotency key
+- [x] Implement `ConfirmBooking()`
+- [x] Implement `CancelBooking()`
+- [x] Implement `GetUserBookings()`
+- [x] Implement `GetPendingBookings()`
+- [x] Write unit tests with mocks
 
 ---
 
-### [ ]  P2-08: Booking Service - HTTP Handlers
+### [x]  P2-08: Booking Service - HTTP Handlers
 | Field | Value |
 |-------|-------|
 | **Description** | Implement HTTP handlers สำหรับ booking endpoints |
 | **Technical Context** | `apps/booking-service/internal/handler/booking_handler.go` |
 | **Acceptance Criteria** | - `POST /bookings/reserve` works<br>- `POST /bookings/:id/confirm` works<br>- `POST /bookings/:id/cancel` works<br>- `GET /bookings` works<br>- `GET /bookings/pending` works |
 
-- [ ] Create `BookingHandler` struct
-- [ ] Implement `Reserve()` handler
-- [ ] Implement `Confirm()` handler
-- [ ] Implement `Cancel()` handler
-- [ ] Implement `List()` handler
-- [ ] Implement `GetPending()` handler
-- [ ] Add request validation
-- [ ] Write API tests
+- [x] Create `BookingHandler` struct
+- [x] Implement `Reserve()` handler
+- [x] Implement `Confirm()` handler
+- [x] Implement `Cancel()` handler
+- [x] Implement `List()` handler
+- [x] Implement `GetPending()` handler
+- [x] Add request validation
+- [x] Write API tests
 
 ---
 
-### [ ]  P2-09: Booking Service - Kafka Producer
+### [x]  P2-09: Booking Service - Kafka Producer
 | Field | Value |
 |-------|-------|
 | **Description** | Implement Kafka producer สำหรับ booking events |
 | **Technical Context** | `apps/booking-service/internal/service/event_publisher.go` |
 | **Acceptance Criteria** | - Publish `booking.created` event<br>- Publish `booking.confirmed` event<br>- Publish `booking.cancelled` event<br>- Publish `booking.expired` event |
 
-- [ ] Create `EventPublisher` interface
-- [ ] Implement Kafka producer wrapper
-- [ ] Define event schemas
-- [ ] Publish events after state changes
-- [ ] Write tests
+- [x] Create `EventPublisher` interface
+- [x] Implement Kafka producer wrapper
+- [x] Define event schemas
+- [x] Publish events after state changes
+- [x] Write tests
 
 ---
 
@@ -1348,7 +1348,7 @@
 - [ ] Add otelsql instrumentation
 - [ ] Add otelhttp transport
 - [ ] Add Kafka span injection/extraction
-- [ ] Verify traces in Jaeger
+- [ ] Verify traces in Grafana Tempo
 
 ---
 
@@ -1387,7 +1387,7 @@
 |-------|-------|
 | **Description** | Setup OTel Collector in Docker Compose |
 | **Technical Context** | `infra/otel/`, `docker-compose.yml` |
-| **Acceptance Criteria** | - OTLP receivers (gRPC + HTTP)<br>- Export to Jaeger, Prometheus, Loki<br>- Processing pipelines configured |
+| **Acceptance Criteria** | - OTLP receivers (gRPC + HTTP)<br>- Export to Tempo, Prometheus, Loki<br>- Processing pipelines configured |
 
 - [ ] Create otel-collector-config.yaml
 - [ ] Add to docker-compose.yml
@@ -1401,11 +1401,11 @@
 ### [ ]  P8-06: Infrastructure - Observability Stack
 | Field | Value |
 |-------|-------|
-| **Description** | Setup Jaeger, Prometheus, Loki, Grafana |
+| **Description** | Setup Tempo, Prometheus, Loki, Grafana |
 | **Technical Context** | `docker-compose.yml` |
 | **Acceptance Criteria** | - All services running<br>- Grafana accessible on :3000<br>- Data sources configured |
 
-- [ ] Add Jaeger to docker-compose
+- [ ] Add Tempo to docker-compose
 - [ ] Add Prometheus to docker-compose
 - [ ] Add Loki to docker-compose
 - [ ] Add Grafana to docker-compose
