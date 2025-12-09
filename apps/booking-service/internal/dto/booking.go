@@ -8,9 +8,13 @@ import (
 
 // ReserveSeatsRequest represents request to reserve seats
 type ReserveSeatsRequest struct {
-	EventID  string `json:"event_id" binding:"required"`
-	ZoneID   string `json:"zone_id" binding:"required"`
-	Quantity int    `json:"quantity" binding:"required,min=1,max=10"`
+	EventID        string  `json:"event_id" binding:"required"`
+	ZoneID         string  `json:"zone_id" binding:"required"`
+	ShowID         string  `json:"show_id,omitempty"`
+	TenantID       string  `json:"tenant_id,omitempty"`
+	Quantity       int     `json:"quantity" binding:"required,min=1,max=10"`
+	UnitPrice      float64 `json:"unit_price,omitempty"`
+	IdempotencyKey string  `json:"idempotency_key,omitempty"`
 }
 
 // ReserveSeatsResponse represents response after reserving seats
@@ -28,9 +32,10 @@ type ConfirmBookingRequest struct {
 
 // ConfirmBookingResponse represents response after confirming a booking
 type ConfirmBookingResponse struct {
-	BookingID   string    `json:"booking_id"`
-	Status      string    `json:"status"`
-	ConfirmedAt time.Time `json:"confirmed_at"`
+	BookingID        string    `json:"booking_id"`
+	Status           string    `json:"status"`
+	ConfirmedAt      time.Time `json:"confirmed_at"`
+	ConfirmationCode string    `json:"confirmation_code,omitempty"`
 }
 
 // ReleaseBookingResponse represents response after releasing a booking
