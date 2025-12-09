@@ -707,17 +707,17 @@
 
 **Goal:** Complete payment flow with data consistency using Saga
 
-### [ ]  P4-01: Payment Service - Project Structure
+### [x]  P4-01: Payment Service - Project Structure
 | Field | Value |
 |-------|-------|
 | **Description** | Setup Payment Service structure |
 | **Technical Context** | `apps/payment-service/internal/` |
-| **Acceptance Criteria** | - Clean Architecture layers<br>- Service starts on :8083<br>- Health check works |
+| **Acceptance Criteria** | - Clean Architecture layers<br>- Service starts on :8084<br>- Health check works |
 
-- [ ] Create project structure
-- [ ] Setup dependency injection
-- [ ] Create `main.go`
-- [ ] Add health check endpoint
+- [x] Create project structure
+- [x] Setup dependency injection
+- [x] Create `main.go`
+- [x] Add health check endpoint
 
 ---
 
