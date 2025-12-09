@@ -608,17 +608,18 @@ func TestAuthService_Logout(t *testing.T) {
 	userRepo.users[testUser.ID] = testUser
 	userRepo.emailIndex[testUser.Email] = testUser
 
-	loginReq := &dto.LoginRequest{
-		Email:    "logout@example.com",
-		Password: "Password1!",
-	}
-	loginResp, err := svc.Login(context.Background(), loginReq, "Test-Agent", "127.0.0.1")
-	if err != nil {
-		t.Fatalf("Setup failed: %v", err)
-	}
-
 	t.Run("successful logout", func(t *testing.T) {
-		err := svc.Logout(context.Background(), loginResp.RefreshToken)
+		// Login to get fresh token
+		loginReq := &dto.LoginRequest{
+			Email:    "logout@example.com",
+			Password: "Password1!",
+		}
+		loginResp, err := svc.Login(context.Background(), loginReq, "Test-Agent", "127.0.0.1")
+		if err != nil {
+			t.Fatalf("Login() error = %v", err)
+		}
+
+		err = svc.Logout(context.Background(), loginResp.RefreshToken)
 		if err != nil {
 			t.Fatalf("Logout() error = %v", err)
 		}
@@ -627,6 +628,124 @@ func TestAuthService_Logout(t *testing.T) {
 		_, err = svc.RefreshToken(context.Background(), loginResp.RefreshToken)
 		if err != ErrSessionNotFound {
 			t.Errorf("After logout, RefreshToken() error = %v, want %v", err, ErrSessionNotFound)
+		}
+	})
+
+	t.Run("logout with invalid token does not error", func(t *testing.T) {
+		err := svc.Logout(context.Background(), "non-existent-refresh-token")
+		if err != nil {
+			t.Errorf("Logout() with invalid token should not error, got %v", err)
+		}
+	})
+
+	t.Run("logout twice does not error", func(t *testing.T) {
+		// Login to get fresh token
+		loginReq := &dto.LoginRequest{
+			Email:    "logout@example.com",
+			Password: "Password1!",
+		}
+		loginResp, err := svc.Login(context.Background(), loginReq, "Test-Agent", "127.0.0.1")
+		if err != nil {
+			t.Fatalf("Login() error = %v", err)
+		}
+
+		// First logout
+		err = svc.Logout(context.Background(), loginResp.RefreshToken)
+		if err != nil {
+			t.Fatalf("First Logout() error = %v", err)
+		}
+
+		// Second logout with same token should not error
+		err = svc.Logout(context.Background(), loginResp.RefreshToken)
+		if err != nil {
+			t.Errorf("Second Logout() should not error, got %v", err)
+		}
+	})
+}
+
+func TestAuthService_LogoutAll(t *testing.T) {
+	userRepo := newMockUserRepository()
+	sessionRepo := newMockSessionRepository()
+	config := &AuthServiceConfig{
+		JWTSecret:          "test-secret-key",
+		AccessTokenExpiry:  15 * time.Minute,
+		RefreshTokenExpiry: 7 * 24 * time.Hour,
+		BcryptCost:         10,
+	}
+	svc := NewAuthService(userRepo, sessionRepo, config)
+
+	// Create user
+	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("Password1!"), 10)
+	testUser := &domain.User{
+		ID:           "logoutall-user-id",
+		Email:        "logoutall@example.com",
+		PasswordHash: string(hashedPassword),
+		Name:         "LogoutAll Test",
+		Role:         domain.RoleUser,
+		IsActive:     true,
+		CreatedAt:    time.Now(),
+		UpdatedAt:    time.Now(),
+	}
+	userRepo.users[testUser.ID] = testUser
+	userRepo.emailIndex[testUser.Email] = testUser
+
+	t.Run("logout all sessions", func(t *testing.T) {
+		loginReq := &dto.LoginRequest{
+			Email:    "logoutall@example.com",
+			Password: "Password1!",
+		}
+
+		// Create multiple sessions
+		session1, err := svc.Login(context.Background(), loginReq, "Chrome", "192.168.1.1")
+		if err != nil {
+			t.Fatalf("Login 1 error = %v", err)
+		}
+		session2, err := svc.Login(context.Background(), loginReq, "Firefox", "192.168.1.2")
+		if err != nil {
+			t.Fatalf("Login 2 error = %v", err)
+		}
+		session3, err := svc.Login(context.Background(), loginReq, "Safari", "192.168.1.3")
+		if err != nil {
+			t.Fatalf("Login 3 error = %v", err)
+		}
+
+		// Verify all sessions exist
+		sessions, _ := sessionRepo.GetByUserID(context.Background(), testUser.ID)
+		if len(sessions) != 3 {
+			t.Fatalf("Expected 3 sessions, got %d", len(sessions))
+		}
+
+		// LogoutAll
+		err = svc.LogoutAll(context.Background(), testUser.ID)
+		if err != nil {
+			t.Fatalf("LogoutAll() error = %v", err)
+		}
+
+		// Verify all sessions are deleted
+		sessions, _ = sessionRepo.GetByUserID(context.Background(), testUser.ID)
+		if len(sessions) != 0 {
+			t.Errorf("Expected 0 sessions after LogoutAll, got %d", len(sessions))
+		}
+
+		// All refresh tokens should be invalid
+		_, err = svc.RefreshToken(context.Background(), session1.RefreshToken)
+		if err != ErrSessionNotFound {
+			t.Errorf("Session 1 RefreshToken() error = %v, want %v", err, ErrSessionNotFound)
+		}
+		_, err = svc.RefreshToken(context.Background(), session2.RefreshToken)
+		if err != ErrSessionNotFound {
+			t.Errorf("Session 2 RefreshToken() error = %v, want %v", err, ErrSessionNotFound)
+		}
+		_, err = svc.RefreshToken(context.Background(), session3.RefreshToken)
+		if err != ErrSessionNotFound {
+			t.Errorf("Session 3 RefreshToken() error = %v, want %v", err, ErrSessionNotFound)
+		}
+	})
+
+	t.Run("logout all with no sessions does not error", func(t *testing.T) {
+		err := svc.LogoutAll(context.Background(), "non-existent-user-id")
+		if err != nil {
+			t.Errorf("LogoutAll() with no sessions should not error, got %v", err)
 		}
 	})
 }

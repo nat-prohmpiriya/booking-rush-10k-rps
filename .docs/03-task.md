@@ -548,16 +548,16 @@
 
 ---
 
-### [ ]  P3-05: Auth Service - Logout
+### [x]  P3-05: Auth Service - Logout
 | Field | Value |
 |-------|-------|
 | **Description** | Implement logout |
 | **Technical Context** | `apps/auth-service/internal/handler/auth_handler.go` |
 | **Acceptance Criteria** | - `POST /auth/logout` invalidates refresh token<br>- Requires authentication |
 
-- [ ] Invalidate refresh token in DB
-- [ ] Return success response
-- [ ] Write tests
+- [x] Invalidate refresh token in DB
+- [x] Return success response
+- [x] Write tests
 
 ---
 
@@ -1555,22 +1555,7 @@
 
 ---
 
-## Progress Summary
 
-| Phase | Tasks | Completed |
-|-------|-------|-----------|
-| Phase 1: Foundation | 13 | 0 |
-| Phase 2: Core Booking | 14 | 0 |
-| Phase 3: Auth & Events | 14 | 0 |
-| Phase 4: Payment & Saga | 12 | 0 |
-| Phase 5: NestJS Services | 8 | 0 |
-| Phase 6: Virtual Queue | 7 | 0 |
-| Phase 7: Frontend | 11 | 0 |
-| Phase 8: Observability | 8 | 0 |
-| Phase 9: Production | 6 | 0 |
-| **Total** | **93** | **0** |
-
----
 
 ## Phase 10: Admin UI
 
