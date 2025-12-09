@@ -500,20 +500,20 @@
 
 ---
 
-### [ ]  P3-02: Auth Service - User Registration
+### [x]  P3-02: Auth Service - User Registration
 | Field | Value |
 |-------|-------|
 | **Description** | Implement user registration |
 | **Technical Context** | `apps/auth-service/internal/handler/auth_handler.go` |
 | **Acceptance Criteria** | - `POST /auth/register` creates user<br>- Email validation<br>- Password hashed with bcrypt (cost 12)<br>- Returns user without password |
 
-- [ ] Create User domain model
-- [ ] Implement UserRepository
-- [ ] Implement registration service logic
-- [ ] Create registration handler
-- [ ] Add email format validation
-- [ ] Add password strength validation
-- [ ] Write tests
+- [x] Create User domain model
+- [x] Implement UserRepository
+- [x] Implement registration service logic
+- [x] Create registration handler
+- [x] Add email format validation
+- [x] Add password strength validation
+- [x] Write tests
 
 ---
 

@@ -86,7 +86,7 @@ func main() {
 			JWTSecret:          jwtSecret,
 			AccessTokenExpiry:  15 * time.Minute,
 			RefreshTokenExpiry: 7 * 24 * time.Hour,
-			BcryptCost:         10,
+			BcryptCost:         12, // Per P3-02 requirement
 		},
 	})
 

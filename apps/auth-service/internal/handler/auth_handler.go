@@ -29,6 +29,18 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
+	// Validate email format
+	if valid, msg := req.ValidateEmail(); !valid {
+		c.JSON(http.StatusBadRequest, response.Error("INVALID_EMAIL", msg))
+		return
+	}
+
+	// Validate password strength
+	if valid, msg := req.ValidatePassword(); !valid {
+		c.JSON(http.StatusBadRequest, response.Error("WEAK_PASSWORD", msg))
+		return
+	}
+
 	result, err := h.authService.Register(c.Request.Context(), &req)
 	if err != nil {
 		if errors.Is(err, service.ErrUserAlreadyExists) {
