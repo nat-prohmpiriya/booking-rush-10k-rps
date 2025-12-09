@@ -25,4 +25,22 @@ type BookingRepository interface {
 
 	// Delete deletes a booking by its ID
 	Delete(ctx context.Context, id string) error
+
+	// Confirm confirms a booking with payment info
+	Confirm(ctx context.Context, id, paymentID string) error
+
+	// Cancel cancels a booking
+	Cancel(ctx context.Context, id string) error
+
+	// GetExpiredReservations gets all expired reservations
+	GetExpiredReservations(ctx context.Context, limit int) ([]*domain.Booking, error)
+
+	// MarkAsExpired marks a booking as expired
+	MarkAsExpired(ctx context.Context, id string) error
+
+	// GetByIdempotencyKey retrieves a booking by idempotency key
+	GetByIdempotencyKey(ctx context.Context, key string) (*domain.Booking, error)
+
+	// CountByUserAndEvent counts bookings for a user on an event
+	CountByUserAndEvent(ctx context.Context, userID, eventID string) (int, error)
 }

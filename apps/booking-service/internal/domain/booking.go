@@ -31,19 +31,27 @@ func (s BookingStatus) String() string {
 
 // Booking represents a booking entity
 type Booking struct {
-	ID          string        `json:"id"`
-	UserID      string        `json:"user_id"`
-	EventID     string        `json:"event_id"`
-	ZoneID      string        `json:"zone_id"`
-	Quantity    int           `json:"quantity"`
-	Status      BookingStatus `json:"status"`
-	TotalPrice  float64       `json:"total_price"`
-	PaymentID   string        `json:"payment_id,omitempty"`
-	ReservedAt  time.Time     `json:"reserved_at"`
-	ConfirmedAt *time.Time    `json:"confirmed_at,omitempty"`
-	ExpiresAt   time.Time     `json:"expires_at"`
-	CreatedAt   time.Time     `json:"created_at"`
-	UpdatedAt   time.Time     `json:"updated_at"`
+	ID               string        `json:"id"`
+	TenantID         string        `json:"tenant_id"`
+	UserID           string        `json:"user_id"`
+	EventID          string        `json:"event_id"`
+	ShowID           string        `json:"show_id"`
+	ZoneID           string        `json:"zone_id"`
+	Quantity         int           `json:"quantity"`
+	UnitPrice        float64       `json:"unit_price"`
+	TotalPrice       float64       `json:"total_price"`
+	Currency         string        `json:"currency"`
+	Status           BookingStatus `json:"status"`
+	StatusReason     string        `json:"status_reason,omitempty"`
+	IdempotencyKey   string        `json:"idempotency_key,omitempty"`
+	PaymentID        string        `json:"payment_id,omitempty"`
+	ConfirmationCode string        `json:"confirmation_code,omitempty"`
+	ReservedAt       time.Time     `json:"reserved_at"`
+	ConfirmedAt      *time.Time    `json:"confirmed_at,omitempty"`
+	CancelledAt      *time.Time    `json:"cancelled_at,omitempty"`
+	ExpiresAt        time.Time     `json:"expires_at"`
+	CreatedAt        time.Time     `json:"created_at"`
+	UpdatedAt        time.Time     `json:"updated_at"`
 }
 
 // Validate validates all booking fields
