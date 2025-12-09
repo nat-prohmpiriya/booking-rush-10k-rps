@@ -5,12 +5,14 @@ import (
 	"github.com/prohmpiriya/booking-rush-10k-rps/apps/ticket-service/internal/repository"
 	"github.com/prohmpiriya/booking-rush-10k-rps/apps/ticket-service/internal/service"
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/database"
+	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/redis"
 )
 
 // Container holds all dependencies for the ticket service
 type Container struct {
 	// Infrastructure
-	DB *database.PostgresDB
+	DB    *database.PostgresDB
+	Redis *redis.Client
 
 	// Repositories
 	EventRepo    repository.EventRepository
@@ -38,17 +40,26 @@ type Container struct {
 
 // ContainerConfig contains configuration for building the container
 type ContainerConfig struct {
-	DB *database.PostgresDB
+	DB    *database.PostgresDB
+	Redis *redis.Client
 }
 
 // NewContainer creates a new dependency injection container
 func NewContainer(cfg *ContainerConfig) *Container {
 	c := &Container{
-		DB: cfg.DB,
+		DB:    cfg.DB,
+		Redis: cfg.Redis,
 	}
 
 	// Initialize repositories
-	c.EventRepo = repository.NewPostgresEventRepository(c.DB.Pool())
+	pgEventRepo := repository.NewPostgresEventRepository(c.DB.Pool())
+
+	// Wrap with cache if Redis is available
+	if c.Redis != nil {
+		c.EventRepo = repository.NewCachedEventRepository(pgEventRepo, c.Redis)
+	} else {
+		c.EventRepo = pgEventRepo
+	}
 	c.VenueRepo = repository.NewPostgresVenueRepository(c.DB.Pool())
 	c.ShowRepo = repository.NewPostgresShowRepository(c.DB.Pool())
 	c.ShowZoneRepo = repository.NewPostgresShowZoneRepository(c.DB.Pool())

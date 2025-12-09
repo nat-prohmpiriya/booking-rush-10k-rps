@@ -16,6 +16,7 @@ import (
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/database"
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/logger"
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/middleware"
+	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/redis"
 )
 
 func main() {
@@ -65,9 +66,34 @@ func main() {
 	defer db.Close()
 	appLog.Info(fmt.Sprintf("Database connected (pool: min=%d, max=%d)", dbCfg.MinConns, dbCfg.MaxConns))
 
+	// Initialize Redis connection (optional - cache will be disabled if connection fails)
+	var redisClient *redis.Client
+	redisCfg := &redis.Config{
+		Host:          cfg.Redis.Host,
+		Port:          cfg.Redis.Port,
+		Password:      cfg.Redis.Password,
+		DB:            cfg.Redis.DB,
+		PoolSize:      cfg.Redis.PoolSize,
+		MinIdleConns:  cfg.Redis.MinIdleConns,
+		DialTimeout:   cfg.Redis.DialTimeout,
+		ReadTimeout:   cfg.Redis.ReadTimeout,
+		WriteTimeout:  cfg.Redis.WriteTimeout,
+		MaxRetries:    3,
+		RetryInterval: time.Second,
+	}
+	redisClient, err = redis.NewClient(ctx, redisCfg)
+	if err != nil {
+		appLog.Warn(fmt.Sprintf("Redis connection failed (caching disabled): %v", err))
+		redisClient = nil
+	} else {
+		defer redisClient.Close()
+		appLog.Info(fmt.Sprintf("Redis connected (%s)", redisCfg.Addr()))
+	}
+
 	// Build dependency injection container
 	container := di.NewContainer(&di.ContainerConfig{
-		DB: db,
+		DB:    db,
+		Redis: redisClient,
 	})
 
 	// Setup Gin

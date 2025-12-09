@@ -653,18 +653,18 @@
 
 ---
 
-### [ ]  P3-12: Ticket Service - Redis Caching
+### [x]  P3-12: Ticket Service - Redis Caching
 | Field | Value |
 |-------|-------|
 | **Description** | Add Redis caching สำหรับ events |
-| **Technical Context** | `apps/ticket-service/internal/repository/cache_repo.go` |
+| **Technical Context** | `apps/ticket-service/internal/repository/cache_event_repository.go` |
 | **Acceptance Criteria** | - Event list cached (TTL: 5 min)<br>- Event detail cached (TTL: 5 min)<br>- Cache invalidation on update |
 
-- [ ] Implement cache layer
-- [ ] Cache event list
-- [ ] Cache event detail
-- [ ] Implement cache invalidation
-- [ ] Write tests
+- [x] Implement cache layer
+- [x] Cache event list
+- [x] Cache event detail
+- [x] Implement cache invalidation
+- [x] Write tests
 
 ---
 
