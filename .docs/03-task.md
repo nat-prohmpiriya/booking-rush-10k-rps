@@ -848,19 +848,19 @@
 
 ---
 
-### [ ]  P4-10: Transactional Outbox
+### [x]  P4-10: Transactional Outbox
 | Field | Value |
 |-------|-------|
 | **Description** | Implement Transactional Outbox pattern |
 | **Technical Context** | `apps/booking-service/internal/repository/outbox_repo.go` |
 | **Acceptance Criteria** | - Write booking + outbox in same transaction<br>- Outbox poller publishes to Kafka<br>- Mark messages as processed |
 
-- [ ] Create OutboxRepository
-- [ ] Write outbox entry in booking transaction
-- [ ] Create outbox poller worker
-- [ ] Publish events to Kafka
-- [ ] Mark as processed
-- [ ] Write tests
+- [x] Create OutboxRepository
+- [x] Write outbox entry in booking transaction
+- [x] Create outbox poller worker
+- [x] Publish events to Kafka
+- [x] Mark as processed
+- [x] Write tests
 
 ---
 
