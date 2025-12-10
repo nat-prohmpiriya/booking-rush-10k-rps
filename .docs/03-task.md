@@ -880,19 +880,19 @@
 
 ---
 
-### [ ]  P4-12: Retry Logic with Backoff
+### [x]  P4-12: Retry Logic with Backoff
 | Field | Value |
 |-------|-------|
 | **Description** | Implement retry logic with exponential backoff |
 | **Technical Context** | `pkg/retry/retry.go` |
 | **Acceptance Criteria** | - Exponential backoff (1s, 2s, 4s)<br>- Jitter to prevent thundering herd<br>- Max retries configurable<br>- Dead letter queue for failed messages |
 
-- [ ] Create retry utility
-- [ ] Implement exponential backoff
-- [ ] Add jitter
-- [ ] Configure max retries
-- [ ] Implement DLQ publishing
-- [ ] Write tests
+- [x] Create retry utility
+- [x] Implement exponential backoff
+- [x] Add jitter
+- [x] Configure max retries
+- [x] Implement DLQ publishing
+- [x] Write tests
 
 ---
 
