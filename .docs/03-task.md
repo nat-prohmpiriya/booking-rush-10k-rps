@@ -721,34 +721,36 @@
 
 ---
 
-### [ ]  P4-02: Payment Service - Kafka Consumer
+### [x]  P4-02: Payment Service - Kafka Consumer
 | Field | Value |
 |-------|-------|
 | **Description** | Implement Kafka consumer สำหรับ booking events |
 | **Technical Context** | `apps/payment-service/internal/consumer/` |
 | **Acceptance Criteria** | - Consume `booking.created` events<br>- Process payment automatically<br>- Produce payment result events |
 
-- [ ] Create Kafka consumer
-- [ ] Handle `booking.created` event
-- [ ] Trigger payment processing
-- [ ] Handle consumer errors and retries
-- [ ] Write tests
+- [x] Create Kafka consumer
+- [x] Handle `booking.created` event
+- [x] Trigger payment processing
+- [x] Handle consumer errors and retries
+- [x] Write tests
 
 ---
 
-### [ ]  P4-03: Payment Service - Payment Processing
+### [x]  P4-03: Payment Service - Payment Processing
 | Field | Value |
 |-------|-------|
-| **Description** | Implement payment processing (mock) |
-| **Technical Context** | `apps/payment-service/internal/service/payment_service.go` |
-| **Acceptance Criteria** | - Create payment record<br>- Process payment (mock success/failure)<br>- Update payment status<br>- Produce `payment.success` or `payment.failed` |
+| **Description** | Implement payment processing with gateway abstraction |
+| **Technical Context** | `apps/payment-service/internal/service/`, `apps/payment-service/internal/gateway/` |
+| **Acceptance Criteria** | - PaymentGateway interface<br>- Mock gateway for load test<br>- Stripe gateway for demo<br>- Feature flag switch via `PAYMENT_GATEWAY` env<br>- Produce `payment.success` or `payment.failed` |
 
-- [ ] Create Payment domain model
-- [ ] Implement PaymentRepository
-- [ ] Implement mock payment gateway
-- [ ] Handle payment states (PENDING → PROCESSING → SUCCESS/FAILED)
-- [ ] Produce result events
-- [ ] Write tests
+- [x] Create PaymentGateway interface
+- [x] Implement MockGateway (configurable success/failure rate)
+- [x] Implement StripeGateway (test mode)
+- [x] Add feature flag switch (`PAYMENT_GATEWAY=mock|stripe`)
+- [x] Implement PaymentRepository (PostgreSQL)
+- [x] Handle payment states (PENDING → PROCESSING → SUCCESS/FAILED)
+- [x] Produce result events to Kafka
+- [x] Write tests (unit + integration)
 
 ---
 

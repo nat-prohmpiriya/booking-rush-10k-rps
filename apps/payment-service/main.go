@@ -8,11 +8,14 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"strconv"
 	"syscall"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/prohmpiriya/booking-rush-10k-rps/apps/payment-service/internal/di"
+	"github.com/prohmpiriya/booking-rush-10k-rps/apps/payment-service/internal/gateway"
+	"github.com/prohmpiriya/booking-rush-10k-rps/apps/payment-service/internal/repository"
 	"github.com/prohmpiriya/booking-rush-10k-rps/apps/payment-service/internal/service"
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/config"
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/database"
@@ -95,12 +98,58 @@ func main() {
 		appLog.Info(fmt.Sprintf("Redis connected (pool: %d, minIdle: %d)", redisCfg.PoolSize, redisCfg.MinIdleConns))
 	}
 
+	// Initialize payment gateway based on feature flag
+	gatewayType := getEnv("PAYMENT_GATEWAY", "mock")
+	var paymentGateway gateway.PaymentGateway
+	var gwErr error
+
+	if gatewayType == "stripe" {
+		stripeSecretKey := os.Getenv("STRIPE_SECRET_KEY")
+		if stripeSecretKey == "" {
+			appLog.Warn("STRIPE_SECRET_KEY not set, falling back to mock gateway")
+			gatewayType = "mock"
+		} else {
+			paymentGateway, gwErr = gateway.NewPaymentGateway("stripe", &gateway.GatewayConfig{
+				SecretKey:   stripeSecretKey,
+				Environment: getEnv("STRIPE_ENVIRONMENT", "test"),
+			})
+			if gwErr != nil {
+				appLog.Warn(fmt.Sprintf("Failed to create Stripe gateway: %v, falling back to mock", gwErr))
+				gatewayType = "mock"
+			}
+		}
+	}
+
+	if gatewayType == "mock" || paymentGateway == nil {
+		successRate := getEnvFloat("MOCK_GATEWAY_SUCCESS_RATE", 0.95)
+		delayMs := getEnvInt("MOCK_GATEWAY_DELAY_MS", 100)
+		paymentGateway = gateway.NewMockGatewayWithConfig(successRate, delayMs)
+		appLog.Info(fmt.Sprintf("Using mock payment gateway (success_rate=%.2f, delay_ms=%d)", successRate, delayMs))
+	} else {
+		appLog.Info("Using Stripe payment gateway")
+	}
+
+	// Initialize payment repository
+	var paymentRepo repository.PaymentRepository
+	if db != nil {
+		paymentRepo = repository.NewPostgresPaymentRepository(db)
+		appLog.Info("Using PostgreSQL payment repository")
+	} else {
+		paymentRepo = repository.NewMemoryPaymentRepository()
+		appLog.Warn("Using in-memory payment repository (data will not persist)")
+	}
+
 	// Build dependency injection container
 	container := di.NewContainer(&di.ContainerConfig{
-		DB:    db,
-		Redis: redisClient,
+		DB:             db,
+		Redis:          redisClient,
+		PaymentRepo:    paymentRepo,
+		PaymentGateway: paymentGateway,
 		ServiceConfig: &service.PaymentServiceConfig{
-			Currency: "THB",
+			Currency:        "THB",
+			GatewayType:     gatewayType,
+			MockSuccessRate: getEnvFloat("MOCK_GATEWAY_SUCCESS_RATE", 0.95),
+			MockDelayMs:     getEnvInt("MOCK_GATEWAY_DELAY_MS", 100),
 		},
 	})
 
@@ -179,11 +228,28 @@ func main() {
 	appLog.Info("Server exited gracefully")
 }
 
+// getEnv returns environment variable or default value
+func getEnv(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}
+
 // getEnvInt returns environment variable as int or default value
 func getEnvInt(key string, defaultValue int) int {
 	if value := os.Getenv(key); value != "" {
-		var result int
-		if _, err := fmt.Sscanf(value, "%d", &result); err == nil {
+		if result, err := strconv.Atoi(value); err == nil {
+			return result
+		}
+	}
+	return defaultValue
+}
+
+// getEnvFloat returns environment variable as float64 or default value
+func getEnvFloat(key string, defaultValue float64) float64 {
+	if value := os.Getenv(key); value != "" {
+		if result, err := strconv.ParseFloat(value, 64); err == nil {
 			return result
 		}
 	}

@@ -1,6 +1,7 @@
 package di
 
 import (
+	"github.com/prohmpiriya/booking-rush-10k-rps/apps/payment-service/internal/gateway"
 	"github.com/prohmpiriya/booking-rush-10k-rps/apps/payment-service/internal/handler"
 	"github.com/prohmpiriya/booking-rush-10k-rps/apps/payment-service/internal/repository"
 	"github.com/prohmpiriya/booking-rush-10k-rps/apps/payment-service/internal/service"
@@ -14,6 +15,9 @@ type Container struct {
 	DB    *database.PostgresDB
 	Redis *redis.Client
 
+	// Gateways
+	PaymentGateway gateway.PaymentGateway
+
 	// Repositories
 	PaymentRepo repository.PaymentRepository
 
@@ -26,25 +30,29 @@ type Container struct {
 
 // ContainerConfig contains configuration for building the container
 type ContainerConfig struct {
-	DB            *database.PostgresDB
-	Redis         *redis.Client
-	PaymentRepo   repository.PaymentRepository
-	ServiceConfig *service.PaymentServiceConfig
+	DB             *database.PostgresDB
+	Redis          *redis.Client
+	PaymentRepo    repository.PaymentRepository
+	PaymentGateway gateway.PaymentGateway
+	ServiceConfig  *service.PaymentServiceConfig
 }
 
 // NewContainer creates a new dependency injection container
 func NewContainer(cfg *ContainerConfig) *Container {
 	c := &Container{
-		DB:          cfg.DB,
-		Redis:       cfg.Redis,
-		PaymentRepo: cfg.PaymentRepo,
+		DB:             cfg.DB,
+		Redis:          cfg.Redis,
+		PaymentRepo:    cfg.PaymentRepo,
+		PaymentGateway: cfg.PaymentGateway,
 	}
 
 	// Initialize handlers
 	c.HealthHandler = handler.NewHealthHandler(c.DB, c.Redis)
 
-	// Note: PaymentService will be initialized when we implement it
-	// c.PaymentService = service.NewPaymentService(...)
+	// Initialize PaymentService if repository and gateway are provided
+	if c.PaymentRepo != nil && c.PaymentGateway != nil {
+		c.PaymentService = service.NewPaymentService(c.PaymentRepo, c.PaymentGateway, cfg.ServiceConfig)
+	}
 
 	return c
 }
