@@ -1,6 +1,4 @@
-go 1.24.0
-
-toolchain go1.24.11
+go 1.24.11
 
 use (
 	./apps/api-gateway
@@ -9,6 +7,7 @@ use (
 	./apps/payment-service
 	./apps/ticket-service
 	./pkg
+	./pkg/saga
 	./scripts
 	./tests/integration
 )
