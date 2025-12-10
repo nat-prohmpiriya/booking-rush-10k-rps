@@ -1,9 +1,9 @@
 package di
 
 import (
-	"github.com/prohmpiriya/booking-rush-10k-rps/backend-auth-service/internal/handler"
-	"github.com/prohmpiriya/booking-rush-10k-rps/backend-auth-service/internal/repository"
-	"github.com/prohmpiriya/booking-rush-10k-rps/backend-auth-service/internal/service"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-auth/internal/handler"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-auth/internal/repository"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-auth/internal/service"
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/database"
 )
 

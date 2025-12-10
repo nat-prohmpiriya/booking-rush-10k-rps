@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking-service/internal/domain"
-	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking-service/internal/dto"
-	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking-service/internal/repository"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking/internal/domain"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking/internal/dto"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking/internal/repository"
 )
 
 // MockBookingRepository is a mock implementation of BookingRepository

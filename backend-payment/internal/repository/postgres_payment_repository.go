@@ -8,7 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/prohmpiriya/booking-rush-10k-rps/backend-payment-service/internal/domain"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-payment/internal/domain"
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/database"
 )
 

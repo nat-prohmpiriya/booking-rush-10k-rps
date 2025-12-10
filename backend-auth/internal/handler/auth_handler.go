@@ -5,8 +5,8 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/prohmpiriya/booking-rush-10k-rps/backend-auth-service/internal/dto"
-	"github.com/prohmpiriya/booking-rush-10k-rps/backend-auth-service/internal/service"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-auth/internal/dto"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-auth/internal/service"
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/response"
 )
 

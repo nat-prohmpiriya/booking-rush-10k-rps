@@ -7,7 +7,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/prohmpiriya/booking-rush-10k-rps/backend-auth-service/internal/domain"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-auth/internal/domain"
 )
 
 // PostgresUserRepository implements UserRepository using PostgreSQL

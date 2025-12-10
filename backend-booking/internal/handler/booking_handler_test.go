@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking-service/internal/domain"
-	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking-service/internal/dto"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking/internal/domain"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking/internal/dto"
 )
 
 // MockBookingService is a mock implementation of BookingService for testing
@@ -98,13 +98,6 @@ func setupTestRouter(handler *BookingHandler) *gin.Engine {
 	}
 
 	return router
-}
-
-func setUserID(c *gin.Context, userID string) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		c.Set("user_id", userID)
-		c.Next()
-	}
 }
 
 func setupTestRouterWithAuth(handler *BookingHandler, userID string) *gin.Engine {

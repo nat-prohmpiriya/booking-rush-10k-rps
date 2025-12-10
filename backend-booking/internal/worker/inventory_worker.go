@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking-service/internal/domain"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking/internal/domain"
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/database"
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/kafka"
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/logger"
@@ -138,7 +138,7 @@ func (w *InventoryWorker) consumeLoop(ctx context.Context, flushCh chan<- struct
 }
 
 // processRecords processes a batch of Kafka records
-func (w *InventoryWorker) processRecords(ctx context.Context, records []*kafka.Record) {
+func (w *InventoryWorker) processRecords(_ context.Context, records []*kafka.Record) {
 	for _, record := range records {
 		if err := w.processRecord(record); err != nil {
 			w.log.Error(fmt.Sprintf("Failed to process record: %v", err))

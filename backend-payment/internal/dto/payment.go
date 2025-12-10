@@ -3,7 +3,7 @@ package dto
 import (
 	"time"
 
-	"github.com/prohmpiriya/booking-rush-10k-rps/backend-payment-service/internal/domain"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-payment/internal/domain"
 )
 
 // CreatePaymentRequest represents a request to create a payment

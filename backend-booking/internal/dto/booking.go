@@ -3,7 +3,7 @@ package dto
 import (
 	"time"
 
-	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking-service/internal/domain"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking/internal/domain"
 )
 
 // ReserveSeatsRequest represents request to reserve seats

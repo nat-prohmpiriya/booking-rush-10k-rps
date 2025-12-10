@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/prohmpiriya/booking-rush-10k-rps/backend-payment-service/internal/domain"
-	"github.com/prohmpiriya/booking-rush-10k-rps/backend-payment-service/internal/service"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-payment/internal/domain"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-payment/internal/service"
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/kafka"
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/logger"
 )

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prohmpiriya/booking-rush-10k-rps/backend-payment-service/internal/domain"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-payment/internal/domain"
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/database"
 )
 

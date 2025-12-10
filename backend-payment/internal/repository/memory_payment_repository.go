@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/prohmpiriya/booking-rush-10k-rps/backend-payment-service/internal/domain"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-payment/internal/domain"
 )
 
 // MemoryPaymentRepository implements PaymentRepository using in-memory storage

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking-service/internal/domain"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking/internal/domain"
 )
 
 // MockEventPublisher is a mock implementation of EventPublisher for testing

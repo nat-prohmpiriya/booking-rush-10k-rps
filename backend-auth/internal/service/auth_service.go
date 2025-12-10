@@ -9,9 +9,9 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
-	"github.com/prohmpiriya/booking-rush-10k-rps/backend-auth-service/internal/domain"
-	"github.com/prohmpiriya/booking-rush-10k-rps/backend-auth-service/internal/dto"
-	"github.com/prohmpiriya/booking-rush-10k-rps/backend-auth-service/internal/repository"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-auth/internal/domain"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-auth/internal/dto"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-auth/internal/repository"
 	"golang.org/x/crypto/bcrypt"
 )
 

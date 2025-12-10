@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking-service/internal/worker"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking/internal/worker"
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/config"
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/database"
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/kafka"

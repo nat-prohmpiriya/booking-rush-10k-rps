@@ -3,7 +3,7 @@ package repository
 import (
 	"context"
 
-	"github.com/prohmpiriya/booking-rush-10k-rps/backend-auth-service/internal/domain"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-auth/internal/domain"
 )
 
 // UserRepository defines the interface for user data access

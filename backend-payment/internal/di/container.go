@@ -1,10 +1,10 @@
 package di
 
 import (
-	"github.com/prohmpiriya/booking-rush-10k-rps/backend-payment-service/internal/gateway"
-	"github.com/prohmpiriya/booking-rush-10k-rps/backend-payment-service/internal/handler"
-	"github.com/prohmpiriya/booking-rush-10k-rps/backend-payment-service/internal/repository"
-	"github.com/prohmpiriya/booking-rush-10k-rps/backend-payment-service/internal/service"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-payment/internal/gateway"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-payment/internal/handler"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-payment/internal/repository"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-payment/internal/service"
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/database"
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/redis"
 )
