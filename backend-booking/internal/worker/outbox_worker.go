@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/booking-service/internal/domain"
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/booking-service/internal/repository"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking-service/internal/domain"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking-service/internal/repository"
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/kafka"
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/logger"
 )

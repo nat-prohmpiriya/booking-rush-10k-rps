@@ -96,23 +96,23 @@ dev-restart: dev-down dev
 
 run-gateway:
 	@echo "$(GREEN)Starting API Gateway...$(NC)"
-	cd apps/api-gateway && go run main.go
+	cd backend-api-gateway && go run main.go
 
 run-auth:
 	@echo "$(GREEN)Starting Auth Service...$(NC)"
-	cd apps/auth-service && go run main.go
+	cd backend-auth-service && go run main.go
 
 run-booking:
 	@echo "$(GREEN)Starting Booking Service...$(NC)"
-	cd apps/booking-service && go run main.go
+	cd backend-booking-service && go run main.go
 
 run-ticket:
 	@echo "$(GREEN)Starting Ticket Service...$(NC)"
-	cd apps/ticket-service && go run main.go
+	cd backend-ticket-service && go run main.go
 
 run-payment:
 	@echo "$(GREEN)Starting Payment Service...$(NC)"
-	cd apps/payment-service && go run main.go
+	cd backend-payment-service && go run main.go
 
 # ================================
 # Build
@@ -123,23 +123,23 @@ build: build-gateway build-auth build-booking build-ticket build-payment
 
 build-gateway:
 	@echo "$(GREEN)Building API Gateway...$(NC)"
-	cd apps/api-gateway && go build -o ../../bin/api-gateway .
+	cd backend-api-gateway && go build -o ../../bin/api-gateway .
 
 build-auth:
 	@echo "$(GREEN)Building Auth Service...$(NC)"
-	cd apps/auth-service && go build -o ../../bin/auth-service . 2>/dev/null || echo "$(YELLOW)Auth Service not ready yet$(NC)"
+	cd backend-auth-service && go build -o ../../bin/auth-service . 2>/dev/null || echo "$(YELLOW)Auth Service not ready yet$(NC)"
 
 build-booking:
 	@echo "$(GREEN)Building Booking Service...$(NC)"
-	cd apps/booking-service && go build -o ../../bin/booking-service . 2>/dev/null || echo "$(YELLOW)Booking Service not ready yet$(NC)"
+	cd backend-booking-service && go build -o ../../bin/booking-service . 2>/dev/null || echo "$(YELLOW)Booking Service not ready yet$(NC)"
 
 build-ticket:
 	@echo "$(GREEN)Building Ticket Service...$(NC)"
-	cd apps/ticket-service && go build -o ../../bin/ticket-service . 2>/dev/null || echo "$(YELLOW)Ticket Service not ready yet$(NC)"
+	cd backend-ticket-service && go build -o ../../bin/ticket-service . 2>/dev/null || echo "$(YELLOW)Ticket Service not ready yet$(NC)"
 
 build-payment:
 	@echo "$(GREEN)Building Payment Service...$(NC)"
-	cd apps/payment-service && go build -o ../../bin/payment-service . 2>/dev/null || echo "$(YELLOW)Payment Service not ready yet$(NC)"
+	cd backend-payment-service && go build -o ../../bin/payment-service . 2>/dev/null || echo "$(YELLOW)Payment Service not ready yet$(NC)"
 
 # ================================
 # Database Migrations
@@ -185,28 +185,28 @@ endif
 
 test:
 	@echo "$(GREEN)Running all tests...$(NC)"
-	go test ./pkg/... ./apps/... -v -race -count=1
+	go test ./pkg/... ./backend-... -v -race -count=1
 	@echo "$(GREEN)All tests passed$(NC)"
 
 test-unit:
 	@echo "$(GREEN)Running unit tests...$(NC)"
-	go test ./pkg/... ./apps/... -v -short -race
+	go test ./pkg/... ./backend-... -v -short -race
 	@echo "$(GREEN)Unit tests passed$(NC)"
 
 test-integration:
 	@echo "$(GREEN)Running integration tests...$(NC)"
-	INTEGRATION_TEST=true go test ./pkg/... ./apps/... -v -race -run Integration
+	INTEGRATION_TEST=true go test ./pkg/... ./backend-... -v -race -run Integration
 	@echo "$(GREEN)Integration tests passed$(NC)"
 
 test-coverage:
 	@echo "$(GREEN)Running tests with coverage...$(NC)"
-	go test ./pkg/... ./apps/... -v -race -coverprofile=coverage.out -covermode=atomic
+	go test ./pkg/... ./backend-... -v -race -coverprofile=coverage.out -covermode=atomic
 	go tool cover -html=coverage.out -o coverage.html
 	@echo "$(GREEN)Coverage report: coverage.html$(NC)"
 
 test-bench:
 	@echo "$(GREEN)Running benchmarks...$(NC)"
-	go test ./pkg/... ./apps/... -bench=. -benchmem
+	go test ./pkg/... ./backend-... -bench=. -benchmem
 
 # ================================
 # Load Testing (k6)
@@ -326,11 +326,11 @@ vet:
 tidy:
 	@echo "$(GREEN)Tidying Go modules...$(NC)"
 	cd pkg && go mod tidy
-	cd apps/api-gateway && go mod tidy
-	cd apps/auth-service && go mod tidy
-	cd apps/booking-service && go mod tidy
-	cd apps/ticket-service && go mod tidy
-	cd apps/payment-service && go mod tidy
+	cd backend-api-gateway && go mod tidy
+	cd backend-auth-service && go mod tidy
+	cd backend-booking-service && go mod tidy
+	cd backend-ticket-service && go mod tidy
+	cd backend-payment-service && go mod tidy
 	go work sync
 	@echo "$(GREEN)Modules tidied$(NC)"
 

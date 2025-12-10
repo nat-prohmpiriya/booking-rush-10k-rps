@@ -13,9 +13,9 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/booking-service/internal/di"
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/booking-service/internal/repository"
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/booking-service/internal/service"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking-service/internal/di"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking-service/internal/repository"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking-service/internal/service"
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/config"
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/database"
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/logger"
@@ -58,11 +58,11 @@ func main() {
 		Password:        cfg.Database.Password,
 		Database:        cfg.Database.DBName,
 		SSLMode:         cfg.Database.SSLMode,
-		MaxConns:        200,                   // Increased for 10k RPS
-		MinConns:        50,                    // Keep minimum pool ready
-		MaxConnLifetime: 30 * time.Minute,     // Reduce to prevent stale connections
-		MaxConnIdleTime: 5 * time.Minute,      // Close idle connections sooner
-		ConnectTimeout:  5 * time.Second,      // Fast fail
+		MaxConns:        200,              // Increased for 10k RPS
+		MinConns:        50,               // Keep minimum pool ready
+		MaxConnLifetime: 30 * time.Minute, // Reduce to prevent stale connections
+		MaxConnIdleTime: 5 * time.Minute,  // Close idle connections sooner
+		ConnectTimeout:  5 * time.Second,  // Fast fail
 		MaxRetries:      3,
 		RetryInterval:   1 * time.Second,
 	}
@@ -80,8 +80,8 @@ func main() {
 		Port:          cfg.Redis.Port,
 		Password:      cfg.Redis.Password,
 		DB:            cfg.Redis.DB,
-		PoolSize:      500,                // Large pool for 10k RPS
-		MinIdleConns:  100,                // Keep connections ready
+		PoolSize:      500, // Large pool for 10k RPS
+		MinIdleConns:  100, // Keep connections ready
 		MaxRetries:    3,
 		RetryInterval: 100 * time.Millisecond,
 		DialTimeout:   5 * time.Second,

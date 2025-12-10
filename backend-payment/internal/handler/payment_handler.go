@@ -6,9 +6,9 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/payment-service/internal/domain"
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/payment-service/internal/dto"
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/payment-service/internal/service"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-payment-service/internal/domain"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-payment-service/internal/dto"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-payment-service/internal/service"
 )
 
 // PaymentHandler handles payment HTTP endpoints

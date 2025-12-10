@@ -6,9 +6,9 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/booking-service/internal/domain"
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/booking-service/internal/dto"
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/booking-service/internal/service"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking-service/internal/domain"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking-service/internal/dto"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking-service/internal/service"
 )
 
 // BookingHandler handles booking HTTP requests

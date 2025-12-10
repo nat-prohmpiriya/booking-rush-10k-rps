@@ -9,9 +9,9 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/auth-service/internal/domain"
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/auth-service/internal/dto"
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/auth-service/internal/repository"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-auth-service/internal/domain"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-auth-service/internal/dto"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-auth-service/internal/repository"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -27,10 +27,10 @@ var (
 
 // AuthServiceConfig holds configuration for AuthService
 type AuthServiceConfig struct {
-	JWTSecret           string
-	AccessTokenExpiry   time.Duration
-	RefreshTokenExpiry  time.Duration
-	BcryptCost          int
+	JWTSecret          string
+	AccessTokenExpiry  time.Duration
+	RefreshTokenExpiry time.Duration
+	BcryptCost         int
 }
 
 // AuthService defines the interface for authentication operations

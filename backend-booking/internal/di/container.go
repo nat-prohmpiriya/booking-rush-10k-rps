@@ -1,9 +1,9 @@
 package di
 
 import (
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/booking-service/internal/handler"
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/booking-service/internal/repository"
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/booking-service/internal/service"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking-service/internal/handler"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking-service/internal/repository"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking-service/internal/service"
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/database"
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/redis"
 )

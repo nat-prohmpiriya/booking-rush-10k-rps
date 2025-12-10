@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/auth-service/internal/di"
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/auth-service/internal/repository"
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/auth-service/internal/service"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-auth-service/internal/di"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-auth-service/internal/repository"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-auth-service/internal/service"
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/config"
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/database"
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/logger"

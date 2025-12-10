@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/ticket-service/internal/domain"
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/ticket-service/internal/dto"
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/ticket-service/internal/repository"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-ticket/internal/domain"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-ticket/internal/dto"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-ticket/internal/repository"
 )
 
 // MockShowRepository is a mock implementation of ShowRepository

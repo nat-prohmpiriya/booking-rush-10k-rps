@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/ticket-service/internal/domain"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-ticket/internal/domain"
 )
 
 // MockEventRepository is a mock implementation of EventRepository for testing

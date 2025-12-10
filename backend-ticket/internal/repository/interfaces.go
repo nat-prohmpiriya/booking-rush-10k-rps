@@ -3,7 +3,7 @@ package repository
 import (
 	"context"
 
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/ticket-service/internal/domain"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-ticket/internal/domain"
 )
 
 // EventRepository defines the interface for event data access

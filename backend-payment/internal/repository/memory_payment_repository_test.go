@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/payment-service/internal/domain"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-payment-service/internal/domain"
 )
 
 func TestNewMemoryPaymentRepository(t *testing.T) {

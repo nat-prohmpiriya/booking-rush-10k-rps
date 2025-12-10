@@ -1,4 +1,4 @@
-module github.com/prohmpiriya/booking-rush-10k-rps/payment-srv
+module github.com/prohmpiriya/booking-rush-10k-rps/backend-payment
 
 go 1.24.0
 

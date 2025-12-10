@@ -4,17 +4,17 @@ import (
 	"context"
 	"sync"
 
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/payment-service/internal/domain"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-payment-service/internal/domain"
 )
 
 // MemoryPaymentRepository implements PaymentRepository using in-memory storage
 // This is useful for testing and development
 type MemoryPaymentRepository struct {
-	payments     map[string]*domain.Payment
-	byBooking    map[string]string // bookingID -> paymentID
-	byUser       map[string][]string // userID -> []paymentID
-	byTransaction map[string]string // transactionID -> paymentID
-	mu           sync.RWMutex
+	payments      map[string]*domain.Payment
+	byBooking     map[string]string   // bookingID -> paymentID
+	byUser        map[string][]string // userID -> []paymentID
+	byTransaction map[string]string   // transactionID -> paymentID
+	mu            sync.RWMutex
 }
 
 // NewMemoryPaymentRepository creates a new in-memory payment repository

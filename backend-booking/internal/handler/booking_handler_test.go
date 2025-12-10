@@ -10,18 +10,18 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/booking-service/internal/domain"
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/booking-service/internal/dto"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking-service/internal/domain"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking-service/internal/dto"
 )
 
 // MockBookingService is a mock implementation of BookingService for testing
 type MockBookingService struct {
-	ReserveSeatsFunc      func(ctx context.Context, userID string, req *dto.ReserveSeatsRequest) (*dto.ReserveSeatsResponse, error)
-	ConfirmBookingFunc    func(ctx context.Context, bookingID, userID string, req *dto.ConfirmBookingRequest) (*dto.ConfirmBookingResponse, error)
-	CancelBookingFunc     func(ctx context.Context, bookingID, userID string) (*dto.ReleaseBookingResponse, error)
-	ReleaseBookingFunc    func(ctx context.Context, bookingID, userID string) (*dto.ReleaseBookingResponse, error)
-	GetBookingFunc        func(ctx context.Context, bookingID, userID string) (*dto.BookingResponse, error)
-	GetUserBookingsFunc   func(ctx context.Context, userID string, page, pageSize int) (*dto.PaginatedResponse, error)
+	ReserveSeatsFunc       func(ctx context.Context, userID string, req *dto.ReserveSeatsRequest) (*dto.ReserveSeatsResponse, error)
+	ConfirmBookingFunc     func(ctx context.Context, bookingID, userID string, req *dto.ConfirmBookingRequest) (*dto.ConfirmBookingResponse, error)
+	CancelBookingFunc      func(ctx context.Context, bookingID, userID string) (*dto.ReleaseBookingResponse, error)
+	ReleaseBookingFunc     func(ctx context.Context, bookingID, userID string) (*dto.ReleaseBookingResponse, error)
+	GetBookingFunc         func(ctx context.Context, bookingID, userID string) (*dto.BookingResponse, error)
+	GetUserBookingsFunc    func(ctx context.Context, userID string, page, pageSize int) (*dto.PaginatedResponse, error)
 	GetPendingBookingsFunc func(ctx context.Context, limit int) ([]*dto.BookingResponse, error)
 	ExpireReservationsFunc func(ctx context.Context, limit int) (int, error)
 }
@@ -571,12 +571,12 @@ func TestBookingHandler_GetBooking(t *testing.T) {
 
 func TestBookingHandler_GetUserBookings(t *testing.T) {
 	tests := []struct {
-		name           string
-		userID         string
-		query          string
-		mockFunc       func(ctx context.Context, userID string, page, pageSize int) (*dto.PaginatedResponse, error)
-		expectedStatus int
-		expectedCode   string
+		name            string
+		userID          string
+		query           string
+		mockFunc        func(ctx context.Context, userID string, page, pageSize int) (*dto.PaginatedResponse, error)
+		expectedStatus  int
+		expectedCode    string
 		checkPagination func(t *testing.T, ctx context.Context, userID string, page, pageSize int)
 	}{
 		{

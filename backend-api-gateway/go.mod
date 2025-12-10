@@ -1,4 +1,4 @@
-module github.com/prohmpiriya/booking-rush-10k-rps/api-gateway-srv
+module github.com/prohmpiriya/booking-rush-10k-rps/backned-api-gateway
 
 go 1.24.0
 

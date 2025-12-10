@@ -9,7 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/ticket-service/internal/domain"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-ticket/internal/domain"
 )
 
 // PostgresEventRepository implements EventRepository using PostgreSQL

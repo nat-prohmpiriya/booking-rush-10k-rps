@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/booking-service/internal/domain"
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/booking-service/internal/repository"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking-service/internal/domain"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking-service/internal/repository"
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/logger"
 )
 
@@ -29,20 +29,20 @@ func DefaultExpiryWorkerConfig() *ExpiryWorkerConfig {
 
 // ExpiryWorker scans and expires stale reservations
 type ExpiryWorker struct {
-	bookingRepo     *repository.PostgresBookingRepository
+	bookingRepo       *repository.PostgresBookingRepository
 	transactionalRepo *repository.TransactionalBookingRepository
-	reservationRepo *repository.RedisReservationRepository
-	config          *ExpiryWorkerConfig
-	log             *logger.Logger
-	stopCh          chan struct{}
-	wg              sync.WaitGroup
-	mu              sync.Mutex
-	running         bool
+	reservationRepo   *repository.RedisReservationRepository
+	config            *ExpiryWorkerConfig
+	log               *logger.Logger
+	stopCh            chan struct{}
+	wg                sync.WaitGroup
+	mu                sync.Mutex
+	running           bool
 
 	// Stats
-	totalExpired    int64
-	totalReleased   int64
-	lastScanTime    time.Time
+	totalExpired     int64
+	totalReleased    int64
+	lastScanTime     time.Time
 	lastExpiredCount int
 }
 
@@ -58,12 +58,12 @@ func NewExpiryWorker(
 	}
 
 	return &ExpiryWorker{
-		bookingRepo:     bookingRepo,
+		bookingRepo:       bookingRepo,
 		transactionalRepo: transactionalRepo,
-		reservationRepo: reservationRepo,
-		config:          config,
-		log:             logger.Get(),
-		stopCh:          make(chan struct{}),
+		reservationRepo:   reservationRepo,
+		config:            config,
+		log:               logger.Get(),
+		stopCh:            make(chan struct{}),
 	}
 }
 

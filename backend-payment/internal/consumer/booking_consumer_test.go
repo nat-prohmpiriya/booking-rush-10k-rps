@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/payment-service/internal/domain"
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/payment-service/internal/gateway"
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/payment-service/internal/repository"
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/payment-service/internal/service"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-payment-service/internal/domain"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-payment-service/internal/gateway"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-payment-service/internal/repository"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-payment-service/internal/service"
 )
 
 // mockPaymentService implements service.PaymentService for testing

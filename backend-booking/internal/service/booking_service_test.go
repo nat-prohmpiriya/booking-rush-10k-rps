@@ -6,25 +6,25 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/booking-service/internal/domain"
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/booking-service/internal/dto"
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/booking-service/internal/repository"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking-service/internal/domain"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking-service/internal/dto"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking-service/internal/repository"
 )
 
 // MockBookingRepository is a mock implementation of BookingRepository
 type MockBookingRepository struct {
-	CreateFunc               func(ctx context.Context, booking *domain.Booking) error
-	GetByIDFunc              func(ctx context.Context, id string) (*domain.Booking, error)
-	GetByUserIDFunc          func(ctx context.Context, userID string, limit, offset int) ([]*domain.Booking, error)
-	UpdateFunc               func(ctx context.Context, booking *domain.Booking) error
-	UpdateStatusFunc         func(ctx context.Context, id string, status domain.BookingStatus) error
-	DeleteFunc               func(ctx context.Context, id string) error
-	ConfirmFunc              func(ctx context.Context, id, paymentID string) error
-	CancelFunc               func(ctx context.Context, id string) error
+	CreateFunc                 func(ctx context.Context, booking *domain.Booking) error
+	GetByIDFunc                func(ctx context.Context, id string) (*domain.Booking, error)
+	GetByUserIDFunc            func(ctx context.Context, userID string, limit, offset int) ([]*domain.Booking, error)
+	UpdateFunc                 func(ctx context.Context, booking *domain.Booking) error
+	UpdateStatusFunc           func(ctx context.Context, id string, status domain.BookingStatus) error
+	DeleteFunc                 func(ctx context.Context, id string) error
+	ConfirmFunc                func(ctx context.Context, id, paymentID string) error
+	CancelFunc                 func(ctx context.Context, id string) error
 	GetExpiredReservationsFunc func(ctx context.Context, limit int) ([]*domain.Booking, error)
-	MarkAsExpiredFunc        func(ctx context.Context, id string) error
-	GetByIdempotencyKeyFunc  func(ctx context.Context, key string) (*domain.Booking, error)
-	CountByUserAndEventFunc  func(ctx context.Context, userID, eventID string) (int, error)
+	MarkAsExpiredFunc          func(ctx context.Context, id string) error
+	GetByIdempotencyKeyFunc    func(ctx context.Context, key string) (*domain.Booking, error)
+	CountByUserAndEventFunc    func(ctx context.Context, userID, eventID string) (int, error)
 }
 
 func (m *MockBookingRepository) Create(ctx context.Context, booking *domain.Booking) error {
@@ -165,12 +165,12 @@ func (m *MockReservationRepository) SetZoneAvailability(ctx context.Context, zon
 
 func TestBookingService_ReserveSeats(t *testing.T) {
 	tests := []struct {
-		name           string
-		userID         string
-		req            *dto.ReserveSeatsRequest
-		setupMocks     func(*MockBookingRepository, *MockReservationRepository)
-		wantErr        error
-		wantBookingID  bool
+		name          string
+		userID        string
+		req           *dto.ReserveSeatsRequest
+		setupMocks    func(*MockBookingRepository, *MockReservationRepository)
+		wantErr       error
+		wantBookingID bool
 	}{
 		{
 			name:   "successful reservation",
@@ -294,9 +294,9 @@ func TestBookingService_ReserveSeats(t *testing.T) {
 			wantErr: domain.ErrInvalidUserID,
 		},
 		{
-			name:   "nil request",
-			userID: "user-001",
-			req:    nil,
+			name:    "nil request",
+			userID:  "user-001",
+			req:     nil,
 			wantErr: domain.ErrInvalidQuantity,
 		},
 	}

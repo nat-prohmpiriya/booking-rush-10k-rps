@@ -1,4 +1,4 @@
-module github.com/prohmpiriya/booking-rush-10k-rps/ticket-srv
+module github.com/prohmpiriya/booking-rush-10k-rps/backend-ticket
 
 go 1.24.0
 
@@ -63,4 +63,4 @@ require (
 	google.golang.org/protobuf v1.36.9 // indirect
 )
 
-replace github.com/prohmpiriya/booking-rush-10k-rps/pkg => ../../pkg
+replace github.com/prohmpiriya/booking-rush-10k-rps/pkg => ../pkg

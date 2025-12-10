@@ -6,20 +6,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/booking-service/internal/domain"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking-service/internal/domain"
 )
 
 // MockEventPublisher is a mock implementation of EventPublisher for testing
 type MockEventPublisher struct {
-	mu                     sync.Mutex
-	createdEvents          []*domain.Booking
-	confirmedEvents        []*domain.Booking
-	cancelledEvents        []*domain.Booking
-	expiredEvents          []*domain.Booking
-	publishCreatedError    error
-	publishConfirmedError  error
-	publishCancelledError  error
-	publishExpiredError    error
+	mu                    sync.Mutex
+	createdEvents         []*domain.Booking
+	confirmedEvents       []*domain.Booking
+	cancelledEvents       []*domain.Booking
+	expiredEvents         []*domain.Booking
+	publishCreatedError   error
+	publishConfirmedError error
+	publishCancelledError error
+	publishExpiredError   error
 }
 
 func NewMockEventPublisher() *MockEventPublisher {

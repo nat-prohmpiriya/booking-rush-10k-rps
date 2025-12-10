@@ -3,7 +3,7 @@ package repository
 import (
 	"context"
 
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/booking-service/internal/domain"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking-service/internal/domain"
 )
 
 // BookingRepository defines the interface for booking data access

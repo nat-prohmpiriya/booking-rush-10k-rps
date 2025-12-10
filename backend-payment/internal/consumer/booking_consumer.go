@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/payment-service/internal/domain"
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/payment-service/internal/service"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-payment-service/internal/domain"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-payment-service/internal/service"
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/kafka"
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/logger"
 )
@@ -29,14 +29,14 @@ type BookingConsumer struct {
 
 // BookingConsumerConfig contains configuration for the booking consumer
 type BookingConsumerConfig struct {
-	Brokers          []string
-	GroupID          string
-	Topic            string
-	PaymentTopic     string
-	MaxRetries       int
-	RetryInterval    time.Duration
-	ProcessTimeout   time.Duration
-	WorkerCount      int
+	Brokers        []string
+	GroupID        string
+	Topic          string
+	PaymentTopic   string
+	MaxRetries     int
+	RetryInterval  time.Duration
+	ProcessTimeout time.Duration
+	WorkerCount    int
 }
 
 // DefaultBookingConsumerConfig returns default configuration

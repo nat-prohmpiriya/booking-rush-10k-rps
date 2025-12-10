@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/booking-service/internal/domain"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking-service/internal/domain"
 )
 
 // PostgresOutboxRepository implements OutboxRepository using PostgreSQL

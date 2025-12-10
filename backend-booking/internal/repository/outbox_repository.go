@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/booking-service/internal/domain"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking-service/internal/domain"
 )
 
 // OutboxRepository defines the interface for outbox data access

@@ -452,7 +452,7 @@ CREATE INDEX idx_outbox_unprocessed ON outbox(created_at) WHERE processed = FALS
 ### 4.1 Project Structure (Monorepo)
 ```
 booking-rush-10k-rps/
-├── apps/
+├── backend-
 │   ├── api-gateway/          # Go - Entry point, routing, rate limiting
 │   │   ├── cmd/
 │   │   ├── internal/

@@ -3,25 +3,25 @@ package dto
 import (
 	"time"
 
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/payment-service/internal/domain"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-payment-service/internal/domain"
 )
 
 // CreatePaymentRequest represents a request to create a payment
 type CreatePaymentRequest struct {
-	BookingID string             `json:"booking_id" binding:"required"`
-	Amount    float64            `json:"amount" binding:"required,gt=0"`
-	Currency  string             `json:"currency" binding:"required"`
+	BookingID string               `json:"booking_id" binding:"required"`
+	Amount    float64              `json:"amount" binding:"required,gt=0"`
+	Currency  string               `json:"currency" binding:"required"`
 	Method    domain.PaymentMethod `json:"method" binding:"required"`
-	Metadata  map[string]string  `json:"metadata,omitempty"`
+	Metadata  map[string]string    `json:"metadata,omitempty"`
 }
 
 // ProcessPaymentRequest represents a request to process a payment
 type ProcessPaymentRequest struct {
 	PaymentID string `json:"payment_id" binding:"required"`
 	// Additional fields for payment gateway
-	CardToken   string `json:"card_token,omitempty"`
-	ReturnURL   string `json:"return_url,omitempty"`
-	WebhookURL  string `json:"webhook_url,omitempty"`
+	CardToken  string `json:"card_token,omitempty"`
+	ReturnURL  string `json:"return_url,omitempty"`
+	WebhookURL string `json:"webhook_url,omitempty"`
 }
 
 // RefundPaymentRequest represents a request to refund a payment

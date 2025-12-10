@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/auth-service/internal/domain"
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/auth-service/internal/dto"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-auth-service/internal/domain"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-auth-service/internal/dto"
 	"golang.org/x/crypto/bcrypt"
 )
 

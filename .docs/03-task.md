@@ -25,10 +25,10 @@
 | Field | Value |
 |-------|-----------|
 | **Description** | สร้างโครงสร้างโฟลเดอร์ตาม monorepo pattern |
-| **Technical Context** | `apps/`, `pkg/`, `scripts/`, `tests/`, `infra/`, `libs/` |
+| **Technical Context** | `backend-`, `pkg/`, `scripts/`, `tests/`, `infra/`, `libs/` |
 | **Acceptance Criteria** | - โครงสร้างโฟลเดอร์ตรงตาม 02-plan.md Section 4.1<br>- `go.work` initialized<br>- `pnpm-workspace.yaml` created |
 
-- [x] Create `apps/` directory with service placeholders
+- [x] Create `backend-` directory with service placeholders
 - [x] Create `pkg/` directory for shared Go packages
 - [x] Create `scripts/lua/` and `scripts/migrations/`
 - [x] Create `infra/` for observability configs
@@ -41,7 +41,7 @@
 | Field | Value |
 |-------|-----------|
 | **Description** | Initialize go modules สำหรับแต่ละ service |
-| **Technical Context** | `apps/api-gateway/go.mod`, `apps/auth-service/go.mod`, etc. |
+| **Technical Context** | `backend-api-gateway/go.mod`, `backend-auth-service/go.mod`, etc. |
 | **Acceptance Criteria** | - ทุก service มี `go.mod`<br>- `go work sync` ทำงานได้<br>- Shared pkg import ได้ |
 
 - [x] `go mod init` for api-gateway
@@ -50,7 +50,7 @@
 - [x] `go mod init` for booking-service
 - [x] `go mod init` for payment-service
 - [x] `go mod init` for pkg/
-- [x] Run `go work use ./apps/* ./pkg`
+- [x] Run `go work use ./backend-* ./pkg`
 
 ---
 
@@ -185,7 +185,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Setup API Gateway ด้วย Gin framework |
-| **Technical Context** | `apps/api-gateway/main.go`, `apps/api-gateway/internal/` |
+| **Technical Context** | `backend-api-gateway/main.go`, `backend-api-gateway/internal/` |
 | **Acceptance Criteria** | - Server starts on :8080<br>- `/health` returns 200<br>- `/ready` checks DB & Redis |
 
 - [x] Create `main.go` entry point
@@ -288,7 +288,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | สร้าง Clean Architecture structure สำหรับ Booking Service |
-| **Technical Context** | `apps/booking-service/internal/` |
+| **Technical Context** | `backend-booking-service/internal/` |
 | **Acceptance Criteria** | - Layers: handler, service, repository, domain<br>- Dependency injection setup<br>- Service starts without error |
 
 - [x] Create `internal/handler/` directory
@@ -305,7 +305,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | สร้าง domain entities สำหรับ booking |
-| **Technical Context** | `apps/booking-service/internal/domain/booking.go` |
+| **Technical Context** | `backend-booking-service/internal/domain/booking.go` |
 | **Acceptance Criteria** | - Booking entity with all fields<br>- Status enum (reserved, confirmed, cancelled, expired)<br>- Validation methods |
 
 - [x] Create `Booking` struct
@@ -320,7 +320,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Implement repository สำหรับ PostgreSQL และ Redis |
-| **Technical Context** | `apps/booking-service/internal/repository/` |
+| **Technical Context** | `backend-booking-service/internal/repository/` |
 | **Acceptance Criteria** | - PostgreSQL CRUD operations<br>- Redis Lua script execution<br>- Transaction support |
 
 - [x] Create `BookingRepository` interface
@@ -337,7 +337,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Implement business logic สำหรับ booking |
-| **Technical Context** | `apps/booking-service/internal/service/booking_service.go` |
+| **Technical Context** | `backend-booking-service/internal/service/booking_service.go` |
 | **Acceptance Criteria** | - Reserve seats with idempotency<br>- Confirm booking<br>- Cancel booking<br>- List user bookings |
 
 - [x] Create `BookingService` struct
@@ -354,7 +354,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Implement HTTP handlers สำหรับ booking endpoints |
-| **Technical Context** | `apps/booking-service/internal/handler/booking_handler.go` |
+| **Technical Context** | `backend-booking-service/internal/handler/booking_handler.go` |
 | **Acceptance Criteria** | - `POST /bookings/reserve` works<br>- `POST /bookings/:id/confirm` works<br>- `POST /bookings/:id/cancel` works<br>- `GET /bookings` works<br>- `GET /bookings/pending` works |
 
 - [x] Create `BookingHandler` struct
@@ -372,7 +372,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Implement Kafka producer สำหรับ booking events |
-| **Technical Context** | `apps/booking-service/internal/service/event_publisher.go` |
+| **Technical Context** | `backend-booking-service/internal/service/event_publisher.go` |
 | **Acceptance Criteria** | - Publish `booking.created` event<br>- Publish `booking.confirmed` event<br>- Publish `booking.cancelled` event<br>- Publish `booking.expired` event |
 
 - [x] Create `EventPublisher` interface
@@ -387,7 +387,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | สร้าง worker สำหรับ sync Redis → PostgreSQL |
-| **Technical Context** | `apps/booking-service/cmd/inventory-worker/` |
+| **Technical Context** | `backend-booking-service/cmd/inventory-worker/` |
 | **Acceptance Criteria** | - Consume booking events from Kafka<br>- Batch update PostgreSQL every 5 seconds<br>- Handle Redis rebuild on startup |
 
 - [x] Create Kafka consumer
@@ -459,7 +459,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | ตรวจสอบว่า Booking Service ปฏิเสธ requests เกินกำลังได้อย่างมีประสิทธิภาพ (ก่อน Virtual Queue พร้อมใน Phase 6) |
-| **Technical Context** | `apps/booking-service/`, `apps/api-gateway/` |
+| **Technical Context** | `backend-booking-service/`, `backend-api-gateway/` |
 | **Acceptance Criteria** | - 429 responses returned < 5ms<br>- No resource exhaustion under 20k RPS spike<br>- Error messages เข้าใจง่ายสำหรับ client |
 
 - [x] Test API Gateway rate limiting under 20k RPS
@@ -490,7 +490,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Setup Auth Service structure |
-| **Technical Context** | `apps/auth-service/internal/` |
+| **Technical Context** | `backend-auth-service/internal/` |
 | **Acceptance Criteria** | - Clean Architecture layers<br>- Service starts on :8081<br>- Health check works |
 
 - [x] Create project structure (handler, service, repository, domain)
@@ -504,7 +504,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Implement user registration |
-| **Technical Context** | `apps/auth-service/internal/handler/auth_handler.go` |
+| **Technical Context** | `backend-auth-service/internal/handler/auth_handler.go` |
 | **Acceptance Criteria** | - `POST /auth/register` creates user<br>- Email validation<br>- Password hashed with bcrypt (cost 12)<br>- Returns user without password |
 
 - [x] Create User domain model
@@ -521,7 +521,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Implement login with JWT |
-| **Technical Context** | `apps/auth-service/internal/service/auth_service.go` |
+| **Technical Context** | `backend-auth-service/internal/service/auth_service.go` |
 | **Acceptance Criteria** | - `POST /auth/login` returns access + refresh token<br>- Access token: 15 min expiry<br>- Refresh token: 7 days expiry<br>- JWT contains: sub, email, role, tenant_id |
 
 - [x] Implement password verification
@@ -537,7 +537,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Implement token refresh |
-| **Technical Context** | `apps/auth-service/internal/handler/auth_handler.go` |
+| **Technical Context** | `backend-auth-service/internal/handler/auth_handler.go` |
 | **Acceptance Criteria** | - `POST /auth/refresh` returns new access token<br>- Validates refresh token<br>- Rotates refresh token (security) |
 
 - [x] Validate refresh token
@@ -552,7 +552,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Implement logout |
-| **Technical Context** | `apps/auth-service/internal/handler/auth_handler.go` |
+| **Technical Context** | `backend-auth-service/internal/handler/auth_handler.go` |
 | **Acceptance Criteria** | - `POST /auth/logout` invalidates refresh token<br>- Requires authentication |
 
 - [x] Invalidate refresh token in DB
@@ -565,7 +565,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Implement profile management |
-| **Technical Context** | `apps/auth-service/internal/handler/auth_handler.go` |
+| **Technical Context** | `backend-auth-service/internal/handler/auth_handler.go` |
 | **Acceptance Criteria** | - `GET /auth/me` returns current user<br>- `PUT /auth/me` updates profile |
 
 - [x] Implement `GET /auth/me`
@@ -594,7 +594,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Setup Ticket Service structure |
-| **Technical Context** | `apps/ticket-service/internal/` |
+| **Technical Context** | `backend-ticket-service/internal/` |
 | **Acceptance Criteria** | - Clean Architecture layers<br>- Service starts on :8082<br>- Health check works |
 
 - [x] Create project structure
@@ -608,7 +608,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Implement Event CRUD operations |
-| **Technical Context** | `apps/ticket-service/internal/handler/event_handler.go` |
+| **Technical Context** | `backend-ticket-service/internal/handler/event_handler.go` |
 | **Acceptance Criteria** | - `GET /events` lists events (paginated)<br>- `GET /events/:slug` returns event detail<br>- `POST /events` creates event (Organizer only)<br>- `PUT /events/:id` updates event<br>- `DELETE /events/:id` soft deletes event |
 
 - [x] Create Event domain model
@@ -627,7 +627,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Implement Show management |
-| **Technical Context** | `apps/ticket-service/internal/handler/show_handler.go` |
+| **Technical Context** | `backend-ticket-service/internal/handler/show_handler.go` |
 | **Acceptance Criteria** | - `GET /events/:slug/shows` lists shows<br>- `POST /events/:id/shows` creates show |
 
 - [x] Create Show domain model
@@ -642,7 +642,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Implement Zone/Seat management |
-| **Technical Context** | `apps/ticket-service/internal/handler/show_zone_handler.go` |
+| **Technical Context** | `backend-ticket-service/internal/handler/show_zone_handler.go` |
 | **Acceptance Criteria** | - `GET /shows/:id/zones` lists zones with availability<br>- `POST /shows/:id/zones` creates zone |
 
 - [x] Create ShowZone domain model
@@ -657,7 +657,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Add Redis caching สำหรับ events |
-| **Technical Context** | `apps/ticket-service/internal/repository/cache_event_repository.go` |
+| **Technical Context** | `backend-ticket-service/internal/repository/cache_event_repository.go` |
 | **Acceptance Criteria** | - Event list cached (TTL: 5 min)<br>- Event detail cached (TTL: 5 min)<br>- Cache invalidation on update |
 
 - [x] Implement cache layer
@@ -672,7 +672,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Implement Token Bucket rate limiting |
-| **Technical Context** | `apps/api-gateway/internal/middleware/rate_limiter.go` |
+| **Technical Context** | `backend-api-gateway/internal/middleware/rate_limiter.go` |
 | **Acceptance Criteria** | - Token Bucket algorithm with burst<br>- Per-endpoint configuration<br>- Store state in Redis<br>- Return 429 with `Retry-After` header |
 
 - [x] Implement Token Bucket algorithm
@@ -688,7 +688,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Implement routing to backend services |
-| **Technical Context** | `apps/api-gateway/internal/proxy/proxy.go`, `router.go` |
+| **Technical Context** | `backend-api-gateway/internal/proxy/proxy.go`, `router.go` |
 | **Acceptance Criteria** | - Route `/auth/*` to Auth Service<br>- Route `/events/*` to Ticket Service<br>- Route `/bookings/*` to Booking Service<br>- JWT middleware on protected routes |
 
 - [x] Implement reverse proxy
@@ -711,7 +711,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Setup Payment Service structure |
-| **Technical Context** | `apps/payment-service/internal/` |
+| **Technical Context** | `backend-payment-service/internal/` |
 | **Acceptance Criteria** | - Clean Architecture layers<br>- Service starts on :8084<br>- Health check works |
 
 - [x] Create project structure
@@ -725,7 +725,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Implement Kafka consumer สำหรับ booking events |
-| **Technical Context** | `apps/payment-service/internal/consumer/` |
+| **Technical Context** | `backend-payment-service/internal/consumer/` |
 | **Acceptance Criteria** | - Consume `booking.created` events<br>- Process payment automatically<br>- Produce payment result events |
 
 - [x] Create Kafka consumer
@@ -740,7 +740,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Implement payment processing with gateway abstraction |
-| **Technical Context** | `apps/payment-service/internal/service/`, `apps/payment-service/internal/gateway/` |
+| **Technical Context** | `backend-payment-service/internal/service/`, `backend-payment-service/internal/gateway/` |
 | **Acceptance Criteria** | - PaymentGateway interface<br>- Mock gateway for load test<br>- Stripe gateway for demo<br>- Feature flag switch via `PAYMENT_GATEWAY` env<br>- Produce `payment.success` or `payment.failed` |
 
 - [x] Create PaymentGateway interface
@@ -758,7 +758,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Implement payment HTTP endpoints |
-| **Technical Context** | `apps/payment-service/internal/handler/` |
+| **Technical Context** | `backend-payment-service/internal/handler/` |
 | **Acceptance Criteria** | - `POST /payments` initiates payment<br>- `GET /payments/:id` returns status<br>- `POST /payments/:id/refund` requests refund |
 
 - [x] Implement payment initiation endpoint
@@ -803,7 +803,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Implement Booking Saga with all steps |
-| **Technical Context** | `apps/booking-service/internal/saga/booking_saga.go` |
+| **Technical Context** | `backend-booking-service/internal/saga/booking_saga.go` |
 | **Acceptance Criteria** | - Step 1: Reserve Seats (compensate: Release)<br>- Step 2: Process Payment (compensate: Refund)<br>- Step 3: Confirm Booking<br>- Step 4: Send Notification |
 
 - [x] Define BookingSaga with steps
@@ -821,7 +821,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Integrate Saga with Kafka commands/events |
-| **Technical Context** | `apps/booking-service/internal/saga/` |
+| **Technical Context** | `backend-booking-service/internal/saga/` |
 | **Acceptance Criteria** | - Produce saga command topics<br>- Consume saga event topics<br>- Handle timeouts |
 
 - [x] Define saga command topics
@@ -852,7 +852,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Implement Transactional Outbox pattern |
-| **Technical Context** | `apps/booking-service/internal/repository/outbox_repo.go` |
+| **Technical Context** | `backend-booking-service/internal/repository/outbox_repo.go` |
 | **Acceptance Criteria** | - Write booking + outbox in same transaction<br>- Outbox poller publishes to Kafka<br>- Mark messages as processed |
 
 - [x] Create OutboxRepository
@@ -868,7 +868,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Implement worker สำหรับ expire reservations |
-| **Technical Context** | `apps/booking-service/cmd/expiry-worker/` |
+| **Technical Context** | `backend-booking-service/cmd/expiry-worker/` |
 | **Acceptance Criteria** | - Scan expired reservations<br>- Release seats back to inventory<br>- Update booking status to `expired`<br>- Produce `booking.expired` event |
 
 - [x] Create expiry worker
@@ -908,7 +908,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Setup NestJS project for Notification Service |
-| **Technical Context** | `apps/notification-service/` |
+| **Technical Context** | `backend-notification-service/` |
 | **Acceptance Criteria** | - NestJS project initialized<br>- MongoDB connected<br>- Kafka consumer configured<br>- Service starts on :8084 |
 
 - [ ] Initialize NestJS project
@@ -924,7 +924,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Create MongoDB schemas for notifications |
-| **Technical Context** | `apps/notification-service/src/schemas/` |
+| **Technical Context** | `backend-notification-service/src/schemas/` |
 | **Acceptance Criteria** | - `notifications` collection schema<br>- `notification_templates` collection schema<br>- Indexes created |
 
 - [ ] Create Notification schema
@@ -939,7 +939,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Implement email sending module |
-| **Technical Context** | `apps/notification-service/src/modules/email/` |
+| **Technical Context** | `backend-notification-service/src/modules/email/` |
 | **Acceptance Criteria** | - Send emails via Nodemailer/SendGrid<br>- Support HTML templates (Handlebars)<br>- Retry on failure |
 
 - [ ] Create EmailModule
@@ -954,7 +954,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Consume booking/payment events |
-| **Technical Context** | `apps/notification-service/src/modules/kafka/` |
+| **Technical Context** | `backend-notification-service/src/modules/kafka/` |
 | **Acceptance Criteria** | - Consume `booking.created` → booking confirmation<br>- Consume `booking.confirmed` → e-ticket<br>- Consume `payment.success` → payment receipt<br>- Consume `booking.expired` → expiry notice |
 
 - [ ] Create KafkaModule
@@ -971,7 +971,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Setup NestJS project for Analytics Service |
-| **Technical Context** | `apps/analytics-service/` |
+| **Technical Context** | `backend-analytics-service/` |
 | **Acceptance Criteria** | - NestJS project initialized<br>- MongoDB connected<br>- Kafka consumer configured<br>- Service starts on :8085 |
 
 - [ ] Initialize NestJS project
@@ -986,7 +986,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Create MongoDB schemas for analytics |
-| **Technical Context** | `apps/analytics-service/src/schemas/` |
+| **Technical Context** | `backend-analytics-service/src/schemas/` |
 | **Acceptance Criteria** | - `events_raw` collection (raw event log)<br>- `analytics_daily` collection (aggregated)<br>- `analytics_realtime` collection (TTL index) |
 
 - [ ] Create EventsRaw schema
@@ -1001,7 +1001,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Consume events and aggregate metrics |
-| **Technical Context** | `apps/analytics-service/src/modules/aggregation/` |
+| **Technical Context** | `backend-analytics-service/src/modules/aggregation/` |
 | **Acceptance Criteria** | - Consume all booking/payment events<br>- Store raw events<br>- Update daily aggregations<br>- Update real-time stats |
 
 - [ ] Create AggregationModule
@@ -1016,7 +1016,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Implement REST API for dashboard |
-| **Technical Context** | `apps/analytics-service/src/modules/api/` |
+| **Technical Context** | `backend-analytics-service/src/modules/api/` |
 | **Acceptance Criteria** | - `GET /analytics/events/:id/realtime` returns real-time stats<br>- `GET /analytics/events/:id/daily` returns daily stats<br>- `GET /analytics/dashboard` returns overview |
 
 - [ ] Create ApiModule
@@ -1039,7 +1039,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Implement queue join endpoint |
-| **Technical Context** | `apps/booking-service/internal/handler/queue_handler.go` |
+| **Technical Context** | `backend-booking-service/internal/handler/queue_handler.go` |
 | **Acceptance Criteria** | - `POST /queue/join` adds user to queue<br>- Uses Redis Sorted Set (score = timestamp)<br>- Returns queue position |
 
 - [ ] Create QueueHandler
@@ -1054,7 +1054,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Implement queue status endpoint |
-| **Technical Context** | `apps/booking-service/internal/handler/queue_handler.go` |
+| **Technical Context** | `backend-booking-service/internal/handler/queue_handler.go` |
 | **Acceptance Criteria** | - `GET /queue/status` returns current position<br>- Returns estimated wait time<br>- Returns `ready` status when position = 0 |
 
 - [ ] Implement status endpoint
@@ -1069,7 +1069,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Generate Queue Pass Token when user reaches front |
-| **Technical Context** | `apps/booking-service/internal/service/queue_service.go` |
+| **Technical Context** | `backend-booking-service/internal/service/queue_service.go` |
 | **Acceptance Criteria** | - Generate JWT token when position = 0<br>- Token valid for 5 minutes<br>- Store in Redis for validation |
 
 - [ ] Implement Queue Pass generation
@@ -1084,7 +1084,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Validate Queue Pass in API Gateway |
-| **Technical Context** | `apps/api-gateway/internal/middleware/queue_pass.go` |
+| **Technical Context** | `backend-api-gateway/internal/middleware/queue_pass.go` |
 | **Acceptance Criteria** | - Check `X-Queue-Pass` header<br>- Validate token signature and expiry<br>- Bypass rate limit for valid passes<br>- Block users without pass during high traffic |
 
 - [ ] Create Queue Pass middleware
@@ -1100,7 +1100,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Release users from queue in batches |
-| **Technical Context** | `apps/booking-service/cmd/queue-worker/` |
+| **Technical Context** | `backend-booking-service/cmd/queue-worker/` |
 | **Acceptance Criteria** | - Release 100 users per batch<br>- Generate Queue Pass for released users<br>- Run continuously |
 
 - [ ] Create queue release worker
@@ -1130,7 +1130,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Implement audit log viewing endpoints |
-| **Technical Context** | `apps/admin-service/` or API Gateway |
+| **Technical Context** | `backend-admin-service/` or API Gateway |
 | **Acceptance Criteria** | - `GET /admin/audit-logs` lists logs (paginated)<br>- Filter by user, action, entity<br>- Admin only access |
 
 - [ ] Create audit log repository
@@ -1153,7 +1153,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Initialize Next.js 15 project |
-| **Technical Context** | `apps/web/` |
+| **Technical Context** | `backend-web/` |
 | **Acceptance Criteria** | - Next.js 15 with App Router<br>- TailwindCSS configured<br>- Shadcn UI installed<br>- Development server runs |
 
 - [ ] Create Next.js project
@@ -1168,7 +1168,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Setup API client with Axios |
-| **Technical Context** | `apps/web/lib/api.ts` |
+| **Technical Context** | `backend-web/lib/api.ts` |
 | **Acceptance Criteria** | - Axios instance with base URL<br>- JWT token injection<br>- Error handling<br>- Token refresh logic |
 
 - [ ] Create Axios instance
@@ -1183,7 +1183,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Implement auth state with Zustand |
-| **Technical Context** | `apps/web/store/auth.ts` |
+| **Technical Context** | `backend-web/store/auth.ts` |
 | **Acceptance Criteria** | - Login/logout actions<br>- Persist tokens in localStorage<br>- User state available globally |
 
 - [ ] Create auth store
@@ -1198,7 +1198,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Create auth pages |
-| **Technical Context** | `apps/web/app/auth/` |
+| **Technical Context** | `backend-web/app/auth/` |
 | **Acceptance Criteria** | - `/auth/login` page<br>- `/auth/register` page<br>- Form validation<br>- Error handling |
 
 - [ ] Create login page
@@ -1213,7 +1213,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Create event listing page |
-| **Technical Context** | `apps/web/app/page.tsx` |
+| **Technical Context** | `backend-web/app/page.tsx` |
 | **Acceptance Criteria** | - Homepage shows event list<br>- Search and filter support<br>- Pagination<br>- Responsive design |
 
 - [ ] Create event list component
@@ -1228,7 +1228,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Create event detail page |
-| **Technical Context** | `apps/web/app/events/[slug]/page.tsx` |
+| **Technical Context** | `backend-web/app/events/[slug]/page.tsx` |
 | **Acceptance Criteria** | - `/events/:slug` shows event details<br>- Shows available shows<br>- Shows countdown to sale start<br>- "Book Now" button |
 
 - [ ] Create event detail page
@@ -1243,7 +1243,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Create zone selection page |
-| **Technical Context** | `apps/web/app/events/[slug]/booking/page.tsx` |
+| **Technical Context** | `backend-web/app/events/[slug]/booking/page.tsx` |
 | **Acceptance Criteria** | - Show available zones<br>- Real-time availability<br>- Quantity selector (max 4)<br>- Price calculation |
 
 - [ ] Create zone selection page
@@ -1258,7 +1258,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Create payment page |
-| **Technical Context** | `apps/web/app/events/[slug]/payment/page.tsx` |
+| **Technical Context** | `backend-web/app/events/[slug]/payment/page.tsx` |
 | **Acceptance Criteria** | - Show order summary<br>- Countdown timer (10 min)<br>- Payment form (mock)<br>- Handle timeout |
 
 - [ ] Create payment page
@@ -1274,7 +1274,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Create confirmation page |
-| **Technical Context** | `apps/web/app/bookings/[id]/page.tsx` |
+| **Technical Context** | `backend-web/app/bookings/[id]/page.tsx` |
 | **Acceptance Criteria** | - Show booking details<br>- Show E-Ticket (QR code)<br>- Download option |
 
 - [ ] Create confirmation page
@@ -1288,7 +1288,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Create queue waiting room page |
-| **Technical Context** | `apps/web/app/queue/page.tsx` |
+| **Technical Context** | `backend-web/app/queue/page.tsx` |
 | **Acceptance Criteria** | - Show queue position<br>- Show estimated wait time<br>- Auto-refresh status<br>- Auto-redirect when ready |
 
 - [ ] Create queue page
@@ -1303,7 +1303,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Create user dashboard pages |
-| **Technical Context** | `apps/web/app/bookings/` |
+| **Technical Context** | `backend-web/app/bookings/` |
 | **Acceptance Criteria** | - Booking history list<br>- Pending bookings with "Resume Payment"<br>- Profile settings |
 
 - [ ] Create booking history page
@@ -1566,7 +1566,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Setup Next.js admin dashboard project |
-| **Technical Context** | `apps/admin/` |
+| **Technical Context** | `backend-admin/` |
 | **Acceptance Criteria** | - Next.js 15 with App Router<br>- TailwindCSS + Shadcn UI<br>- Authentication (admin-only)<br>- Basic layout with sidebar |
 
 - [ ] Create Next.js project for admin
@@ -1581,7 +1581,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | CRUD interface for managing events |
-| **Technical Context** | `apps/admin/app/events/` |
+| **Technical Context** | `backend-admin/app/events/` |
 | **Acceptance Criteria** | - Event list with search/filter<br>- Create new event form<br>- Edit event form<br>- Delete event (soft delete) |
 
 - [ ] Create event list page with DataTable
@@ -1597,7 +1597,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Interface for managing zones within events/shows |
-| **Technical Context** | `apps/admin/app/events/[id]/zones/` |
+| **Technical Context** | `backend-admin/app/events/[id]/zones/` |
 | **Acceptance Criteria** | - Zone list per event/show<br>- Create zone with: name, capacity, price<br>- Edit zone details<br>- Real-time availability display |
 
 - [ ] Create zone list page for event/show
@@ -1612,7 +1612,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Visual tool for creating seat maps |
-| **Technical Context** | `apps/admin/app/events/[id]/seat-map/` |
+| **Technical Context** | `backend-admin/app/events/[id]/seat-map/` |
 | **Acceptance Criteria** | - Drag-and-drop zone placement<br>- Set zone shapes and positions<br>- Preview seat map<br>- Export as JSON |
 
 - [ ] Create canvas-based seat map editor
@@ -1627,7 +1627,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Real-time sales monitoring dashboard |
-| **Technical Context** | `apps/admin/app/dashboard/` |
+| **Technical Context** | `backend-admin/app/dashboard/` |
 | **Acceptance Criteria** | - Total sales overview<br>- Sales by event/zone<br>- Real-time booking stream<br>- Revenue charts |
 
 - [ ] Create dashboard overview page
@@ -1642,7 +1642,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | View and manage bookings |
-| **Technical Context** | `apps/admin/app/bookings/` |
+| **Technical Context** | `backend-admin/app/bookings/` |
 | **Acceptance Criteria** | - Booking list with filters<br>- View booking details<br>- Manual booking actions (cancel, refund)<br>- Export bookings to CSV |
 
 - [ ] Create booking list with DataTable
@@ -1658,7 +1658,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Manage users and their roles |
-| **Technical Context** | `apps/admin/app/users/` |
+| **Technical Context** | `backend-admin/app/users/` |
 | **Acceptance Criteria** | - User list with search<br>- View user details and bookings<br>- Change user roles<br>- Suspend/unsuspend users |
 
 - [ ] Create user list page
@@ -1673,7 +1673,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Control when events are available for booking |
-| **Technical Context** | `apps/admin/app/events/[id]/sales/` |
+| **Technical Context** | `backend-admin/app/events/[id]/sales/` |
 | **Acceptance Criteria** | - Set sale start/end datetime<br>- Manual open/close sales toggle<br>- Schedule sale windows<br>- Emergency stop sales button |
 
 - [ ] Create sales control panel

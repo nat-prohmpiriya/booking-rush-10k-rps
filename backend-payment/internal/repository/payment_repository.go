@@ -3,7 +3,7 @@ package repository
 import (
 	"context"
 
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/payment-service/internal/domain"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-payment-service/internal/domain"
 )
 
 // PaymentRepository defines the interface for payment data access

@@ -9,18 +9,18 @@ import (
 	"unicode"
 
 	"github.com/google/uuid"
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/ticket-service/internal/domain"
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/ticket-service/internal/dto"
-	"github.com/prohmpiriya/booking-rush-10k-rps/apps/ticket-service/internal/repository"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-ticket/internal/domain"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-ticket/internal/dto"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-ticket/internal/repository"
 )
 
 // Common errors
 var (
-	ErrEventNotFound       = errors.New("event not found")
-	ErrEventAlreadyExists  = errors.New("event with this slug already exists")
-	ErrInvalidEventStatus  = errors.New("invalid event status transition")
-	ErrUnauthorized        = errors.New("unauthorized to perform this action")
-	ErrVenueNotFound       = errors.New("venue not found")
+	ErrEventNotFound      = errors.New("event not found")
+	ErrEventAlreadyExists = errors.New("event with this slug already exists")
+	ErrInvalidEventStatus = errors.New("invalid event status transition")
+	ErrUnauthorized       = errors.New("unauthorized to perform this action")
+	ErrVenueNotFound      = errors.New("venue not found")
 )
 
 // eventService implements EventService
