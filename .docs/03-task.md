@@ -817,19 +817,19 @@
 
 ---
 
-### [ ]  P4-08: Saga Kafka Integration
+### [x]  P4-08: Saga Kafka Integration
 | Field | Value |
 |-------|-------|
 | **Description** | Integrate Saga with Kafka commands/events |
 | **Technical Context** | `apps/booking-service/internal/saga/` |
 | **Acceptance Criteria** | - Produce saga command topics<br>- Consume saga event topics<br>- Handle timeouts |
 
-- [ ] Define saga command topics
-- [ ] Define saga event topics
-- [ ] Produce commands from orchestrator
-- [ ] Consume events and advance saga
-- [ ] Handle step timeouts
-- [ ] Write tests
+- [x] Define saga command topics
+- [x] Define saga event topics
+- [x] Produce commands from orchestrator
+- [x] Consume events and advance saga
+- [x] Handle step timeouts
+- [x] Write tests
 
 ---
 
