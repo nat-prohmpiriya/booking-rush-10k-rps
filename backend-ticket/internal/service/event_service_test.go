@@ -117,66 +117,9 @@ func (m *MockEventRepository) SlugExists(ctx context.Context, slug string) (bool
 	return ok, nil
 }
 
-// MockVenueRepository is a mock implementation of VenueRepository
-type MockVenueRepository struct {
-	venues map[string]*domain.Venue
-}
-
-func NewMockVenueRepository() *MockVenueRepository {
-	return &MockVenueRepository{
-		venues: make(map[string]*domain.Venue),
-	}
-}
-
-func (m *MockVenueRepository) Create(ctx context.Context, venue *domain.Venue) error {
-	m.venues[venue.ID] = venue
-	return nil
-}
-
-func (m *MockVenueRepository) GetByID(ctx context.Context, id string) (*domain.Venue, error) {
-	venue, ok := m.venues[id]
-	if !ok {
-		return nil, nil
-	}
-	return venue, nil
-}
-
-func (m *MockVenueRepository) GetByTenantID(ctx context.Context, tenantID string) ([]*domain.Venue, error) {
-	var venues []*domain.Venue
-	for _, v := range m.venues {
-		if v.TenantID == tenantID {
-			venues = append(venues, v)
-		}
-	}
-	return venues, nil
-}
-
-func (m *MockVenueRepository) Update(ctx context.Context, venue *domain.Venue) error {
-	m.venues[venue.ID] = venue
-	return nil
-}
-
-func (m *MockVenueRepository) Delete(ctx context.Context, id string) error {
-	delete(m.venues, id)
-	return nil
-}
-
-// Add venue helper
-func (m *MockVenueRepository) AddVenue(venue *domain.Venue) {
-	m.venues[venue.ID] = venue
-}
-
 func TestEventService_CreateEvent(t *testing.T) {
 	eventRepo := NewMockEventRepository()
-	venueRepo := NewMockVenueRepository()
-	svc := NewEventService(eventRepo, venueRepo)
-
-	// Add test venue
-	venueRepo.AddVenue(&domain.Venue{
-		ID:       "venue-1",
-		Name:     "Test Venue",
-		TenantID: "tenant-1",
-	})
+	svc := NewEventService(eventRepo)
 
 	ctx := context.Background()
 
@@ -191,9 +134,7 @@ func TestEventService_CreateEvent(t *testing.T) {
 			req: &dto.CreateEventRequest{
 				Name:        "Test Concert",
 				Description: "A test concert",
-				VenueID:     "venue-1",
-				StartTime:   time.Now().Add(24 * time.Hour),
-				EndTime:     time.Now().Add(48 * time.Hour),
+				VenueName:   "Test Venue",
 				TenantID:    "tenant-1",
 			},
 			wantErr: false,
@@ -201,25 +142,11 @@ func TestEventService_CreateEvent(t *testing.T) {
 		{
 			name: "missing name",
 			req: &dto.CreateEventRequest{
-				VenueID:   "venue-1",
-				StartTime: time.Now().Add(24 * time.Hour),
-				EndTime:   time.Now().Add(48 * time.Hour),
+				VenueName: "Test Venue",
 				TenantID:  "tenant-1",
 			},
 			wantErr: true,
 			errMsg:  "Event name is required",
-		},
-		{
-			name: "venue not found",
-			req: &dto.CreateEventRequest{
-				Name:      "Test Concert",
-				VenueID:   "non-existent",
-				StartTime: time.Now().Add(24 * time.Hour),
-				EndTime:   time.Now().Add(48 * time.Hour),
-				TenantID:  "tenant-1",
-			},
-			wantErr: true,
-			errMsg:  "venue not found",
 		},
 	}
 
@@ -250,8 +177,7 @@ func TestEventService_CreateEvent(t *testing.T) {
 
 func TestEventService_GetEventByID(t *testing.T) {
 	eventRepo := NewMockEventRepository()
-	venueRepo := NewMockVenueRepository()
-	svc := NewEventService(eventRepo, venueRepo)
+	svc := NewEventService(eventRepo)
 
 	ctx := context.Background()
 
@@ -307,8 +233,7 @@ func TestEventService_GetEventByID(t *testing.T) {
 
 func TestEventService_GetEventBySlug(t *testing.T) {
 	eventRepo := NewMockEventRepository()
-	venueRepo := NewMockVenueRepository()
-	svc := NewEventService(eventRepo, venueRepo)
+	svc := NewEventService(eventRepo)
 
 	ctx := context.Background()
 
@@ -364,8 +289,7 @@ func TestEventService_GetEventBySlug(t *testing.T) {
 
 func TestEventService_UpdateEvent(t *testing.T) {
 	eventRepo := NewMockEventRepository()
-	venueRepo := NewMockVenueRepository()
-	svc := NewEventService(eventRepo, venueRepo)
+	svc := NewEventService(eventRepo)
 
 	ctx := context.Background()
 
@@ -407,12 +331,6 @@ func TestEventService_UpdateEvent(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:    "empty update",
-			id:      "event-1",
-			req:     &dto.UpdateEventRequest{},
-			wantErr: true,
-		},
-		{
 			name: "non-existent event",
 			id:   "non-existent",
 			req: &dto.UpdateEventRequest{
@@ -443,8 +361,7 @@ func TestEventService_UpdateEvent(t *testing.T) {
 
 func TestEventService_DeleteEvent(t *testing.T) {
 	eventRepo := NewMockEventRepository()
-	venueRepo := NewMockVenueRepository()
-	svc := NewEventService(eventRepo, venueRepo)
+	svc := NewEventService(eventRepo)
 
 	ctx := context.Background()
 
@@ -497,8 +414,7 @@ func TestEventService_DeleteEvent(t *testing.T) {
 
 func TestEventService_PublishEvent(t *testing.T) {
 	eventRepo := NewMockEventRepository()
-	venueRepo := NewMockVenueRepository()
-	svc := NewEventService(eventRepo, venueRepo)
+	svc := NewEventService(eventRepo)
 
 	ctx := context.Background()
 

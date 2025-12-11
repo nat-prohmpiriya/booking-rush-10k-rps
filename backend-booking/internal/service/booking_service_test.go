@@ -25,6 +25,7 @@ type MockBookingRepository struct {
 	MarkAsExpiredFunc          func(ctx context.Context, id string) error
 	GetByIdempotencyKeyFunc    func(ctx context.Context, key string) (*domain.Booking, error)
 	CountByUserAndEventFunc    func(ctx context.Context, userID, eventID string) (int, error)
+	GetTenantIDByShowIDFunc    func(ctx context.Context, showID string) (string, error)
 }
 
 func (m *MockBookingRepository) Create(ctx context.Context, booking *domain.Booking) error {
@@ -109,6 +110,13 @@ func (m *MockBookingRepository) CountByUserAndEvent(ctx context.Context, userID,
 		return m.CountByUserAndEventFunc(ctx, userID, eventID)
 	}
 	return 0, nil
+}
+
+func (m *MockBookingRepository) GetTenantIDByShowID(ctx context.Context, showID string) (string, error) {
+	if m.GetTenantIDByShowIDFunc != nil {
+		return m.GetTenantIDByShowIDFunc(ctx, showID)
+	}
+	return "test-tenant-id", nil
 }
 
 // MockReservationRepository is a mock implementation of ReservationRepository

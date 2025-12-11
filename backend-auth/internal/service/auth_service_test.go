@@ -195,7 +195,7 @@ func TestAuthService_Login(t *testing.T) {
 		Email:        "login@example.com",
 		PasswordHash: string(hashedPassword),
 		Name:         "Login Test",
-		Role:         domain.RoleUser,
+		Role:         domain.RoleCustomer,
 		IsActive:     true,
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
@@ -257,7 +257,7 @@ func TestAuthService_Login(t *testing.T) {
 			Email:        "inactive@example.com",
 			PasswordHash: string(hashedPassword),
 			Name:         "Inactive User",
-			Role:         domain.RoleUser,
+			Role:         domain.RoleCustomer,
 			IsActive:     false,
 			CreatedAt:    time.Now(),
 			UpdatedAt:    time.Now(),
@@ -308,8 +308,8 @@ func TestAuthService_ValidateToken(t *testing.T) {
 		if claims.Email != regReq.Email {
 			t.Errorf("ValidateToken() Email = %v, want %v", claims.Email, regReq.Email)
 		}
-		if claims.Role != domain.RoleUser {
-			t.Errorf("ValidateToken() Role = %v, want %v", claims.Role, domain.RoleUser)
+		if claims.Role != domain.RoleCustomer {
+			t.Errorf("ValidateToken() Role = %v, want %v", claims.Role, domain.RoleCustomer)
 		}
 	})
 
@@ -348,7 +348,7 @@ func TestAuthService_RefreshToken(t *testing.T) {
 		Email:        "refresh@example.com",
 		PasswordHash: string(hashedPassword),
 		Name:         "Refresh Test",
-		Role:         domain.RoleUser,
+		Role:         domain.RoleCustomer,
 		IsActive:     true,
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
@@ -408,7 +408,7 @@ func TestAuthService_RefreshTokenRotation(t *testing.T) {
 		Email:        "rotation@example.com",
 		PasswordHash: string(hashedPassword),
 		Name:         "Rotation Test",
-		Role:         domain.RoleUser,
+		Role:         domain.RoleCustomer,
 		IsActive:     true,
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
@@ -503,7 +503,7 @@ func TestAuthService_RefreshTokenWithInactiveUser(t *testing.T) {
 		Email:        "deactivate@example.com",
 		PasswordHash: string(hashedPassword),
 		Name:         "Deactivate Test",
-		Role:         domain.RoleUser,
+		Role:         domain.RoleCustomer,
 		IsActive:     true,
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
@@ -549,7 +549,7 @@ func TestAuthService_RefreshTokenExpired(t *testing.T) {
 		Email:        "expired@example.com",
 		PasswordHash: string(hashedPassword),
 		Name:         "Expired Test",
-		Role:         domain.RoleUser,
+		Role:         domain.RoleCustomer,
 		IsActive:     true,
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
@@ -600,7 +600,7 @@ func TestAuthService_Logout(t *testing.T) {
 		Email:        "logout@example.com",
 		PasswordHash: string(hashedPassword),
 		Name:         "Logout Test",
-		Role:         domain.RoleUser,
+		Role:         domain.RoleCustomer,
 		IsActive:     true,
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
@@ -681,7 +681,7 @@ func TestAuthService_LogoutAll(t *testing.T) {
 		Email:        "logoutall@example.com",
 		PasswordHash: string(hashedPassword),
 		Name:         "LogoutAll Test",
-		Role:         domain.RoleUser,
+		Role:         domain.RoleCustomer,
 		IsActive:     true,
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
@@ -768,7 +768,7 @@ func TestJWTClaimsContainTenantID(t *testing.T) {
 		Email:        "tenant@example.com",
 		PasswordHash: string(hashedPassword),
 		Name:         "Tenant Test",
-		Role:         domain.RoleUser,
+		Role:         domain.RoleCustomer,
 		TenantID:     "tenant-123",
 		IsActive:     true,
 		CreatedAt:    time.Now(),
@@ -802,8 +802,8 @@ func TestJWTClaimsContainTenantID(t *testing.T) {
 	if claims.Email != testUser.Email {
 		t.Errorf("ValidateToken() Email = %v, want %v", claims.Email, testUser.Email)
 	}
-	if claims.Role != domain.RoleUser {
-		t.Errorf("ValidateToken() Role = %v, want %v", claims.Role, domain.RoleUser)
+	if claims.Role != domain.RoleCustomer {
+		t.Errorf("ValidateToken() Role = %v, want %v", claims.Role, domain.RoleCustomer)
 	}
 }
 
@@ -844,7 +844,7 @@ func TestTokenExpiry(t *testing.T) {
 			Email:        "expiry2@example.com",
 			PasswordHash: string(hashedPassword),
 			Name:         "Expiry Test 2",
-			Role:         domain.RoleUser,
+			Role:         domain.RoleCustomer,
 			IsActive:     true,
 			CreatedAt:    time.Now(),
 			UpdatedAt:    time.Now(),
@@ -927,7 +927,7 @@ func TestAuthService_GetUser(t *testing.T) {
 		Email:        "getuser@example.com",
 		PasswordHash: string(hashedPassword),
 		Name:         "GetUser Test",
-		Role:         domain.RoleUser,
+		Role:         domain.RoleCustomer,
 		IsActive:     true,
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
@@ -983,7 +983,7 @@ func TestAuthService_UpdateProfile(t *testing.T) {
 		Email:        "updateprofile@example.com",
 		PasswordHash: string(hashedPassword),
 		Name:         "Original Name",
-		Role:         domain.RoleUser,
+		Role:         domain.RoleCustomer,
 		IsActive:     true,
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),

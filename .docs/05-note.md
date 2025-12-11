@@ -75,3 +75,32 @@
   - orchestrator.go = Central coordinator
   - state.go = State machine (CREATED → RESERVED → PAID →
   CONFIRMED)
+
+
+# strip credit card
+⏺ Stripe Test Cards สำหรับทดสอบครับ:
+
+  บัตรที่ผ่าน:
+  | Card Number         | Description           |
+  |---------------------|-----------------------|
+  | 4242 4242 4242 4242 | Visa - สำเร็จเสมอ       |
+  | 5555 5555 5555 4444 | Mastercard - สำเร็จเสมอ |
+
+  บัตรที่ถูกปฏิเสธ:
+  | Card Number         | Error              |
+  |---------------------|--------------------|
+  | 4000 0000 0000 0002 | Card declined      |
+  | 4000 0000 0000 9995 | Insufficient funds |
+  | 4000 0000 0000 9987 | Lost card          |
+  | 4000 0000 0000 0069 | Expired card       |
+
+  ต้องการ 3D Secure:
+  | Card Number         | Description            |
+  |---------------------|------------------------|
+  | 4000 0025 0000 3155 | 3DS required - จะผ่าน    |
+  | 4000 0000 0000 3220 | 3DS required - จะ fail |
+
+  ใช้กับทุก test card:
+  - Expiration: อนาคตใดก็ได้ เช่น 12/26
+  - CVC: เลข 3 หลักใดก็ได้ เช่น 123
+  - ZIP: เลขใดก็ได้ เช่น 10110

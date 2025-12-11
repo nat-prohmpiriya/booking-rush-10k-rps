@@ -28,12 +28,20 @@ func NewMockShowService() *MockShowService {
 
 func (m *MockShowService) CreateShow(ctx context.Context, req *dto.CreateShowRequest) (*domain.Show, error) {
 	now := time.Now()
+	// Parse times from string (simplified for mock)
+	showDate, _ := time.Parse("2006-01-02", req.ShowDate)
+	startTime, _ := time.Parse("15:04:05", req.StartTime)
+	var endTime time.Time
+	if req.EndTime != "" {
+		endTime, _ = time.Parse("15:04:05", req.EndTime)
+	}
 	show := &domain.Show{
 		ID:        "show-123",
 		EventID:   req.EventID,
 		Name:      req.Name,
-		StartTime: req.StartTime,
-		EndTime:   req.EndTime,
+		ShowDate:  showDate,
+		StartTime: startTime,
+		EndTime:   endTime,
 		Status:    domain.ShowStatusScheduled,
 		CreatedAt: now,
 		UpdatedAt: now,
@@ -134,6 +142,16 @@ func (m *MockEventServiceForShow) PublishEvent(ctx context.Context, id string) (
 	return nil, nil
 }
 
+func (m *MockEventServiceForShow) ListPublishedEvents(ctx context.Context, limit, offset int) ([]*domain.Event, int, error) {
+	var events []*domain.Event
+	for _, e := range m.events {
+		if e.Status == domain.EventStatusPublished {
+			events = append(events, e)
+		}
+	}
+	return events, len(events), nil
+}
+
 func (m *MockEventServiceForShow) AddEvent(event *domain.Event) {
 	m.events[event.ID] = event
 }
@@ -223,7 +241,6 @@ func TestShowHandler_Create(t *testing.T) {
 	handler := NewShowHandler(mockShowSvc, mockEventSvc)
 	router := setupShowRouter(handler)
 
-	now := time.Now()
 	tests := []struct {
 		name       string
 		eventID    string
@@ -235,17 +252,19 @@ func TestShowHandler_Create(t *testing.T) {
 			eventID: "event-1",
 			body: map[string]interface{}{
 				"name":       "Evening Show",
-				"start_time": now.Add(24 * time.Hour).Format(time.RFC3339),
-				"end_time":   now.Add(26 * time.Hour).Format(time.RFC3339),
+				"show_date":  "2024-12-25",
+				"start_time": "19:00:00",
+				"end_time":   "22:00:00",
 			},
 			wantStatus: http.StatusCreated,
 		},
 		{
-			name:    "missing name",
+			name:    "missing show_date",
 			eventID: "event-1",
 			body: map[string]interface{}{
-				"start_time": now.Add(24 * time.Hour).Format(time.RFC3339),
-				"end_time":   now.Add(26 * time.Hour).Format(time.RFC3339),
+				"name":       "Evening Show",
+				"start_time": "19:00:00",
+				"end_time":   "22:00:00",
 			},
 			wantStatus: http.StatusBadRequest,
 		},

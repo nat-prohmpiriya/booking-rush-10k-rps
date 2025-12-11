@@ -30,17 +30,18 @@ func NewMockEventService() *MockEventService {
 func (m *MockEventService) CreateEvent(ctx context.Context, req *dto.CreateEventRequest) (*domain.Event, error) {
 	now := time.Now()
 	event := &domain.Event{
-		ID:          "event-123",
-		Name:        req.Name,
-		Slug:        "test-slug",
-		Description: req.Description,
-		VenueID:     req.VenueID,
-		StartTime:   req.StartTime,
-		EndTime:     req.EndTime,
-		Status:      domain.EventStatusDraft,
-		TenantID:    req.TenantID,
-		CreatedAt:   now,
-		UpdatedAt:   now,
+		ID:             "event-123",
+		Name:           req.Name,
+		Slug:           "test-slug",
+		Description:    req.Description,
+		VenueName:      req.VenueName,
+		VenueAddress:   req.VenueAddress,
+		BookingStartAt: req.BookingStartAt,
+		BookingEndAt:   req.BookingEndAt,
+		Status:         domain.EventStatusDraft,
+		TenantID:       req.TenantID,
+		CreatedAt:      now,
+		UpdatedAt:      now,
 	}
 	m.events[event.ID] = event
 	return event, nil
@@ -103,6 +104,16 @@ func (m *MockEventService) PublishEvent(ctx context.Context, id string) (*domain
 	}
 	event.Status = domain.EventStatusPublished
 	return event, nil
+}
+
+func (m *MockEventService) ListPublishedEvents(ctx context.Context, limit, offset int) ([]*domain.Event, int, error) {
+	var events []*domain.Event
+	for _, e := range m.events {
+		if e.Status == domain.EventStatusPublished {
+			events = append(events, e)
+		}
+	}
+	return events, len(events), nil
 }
 
 // AddEvent adds an event to the mock service
@@ -268,19 +279,19 @@ func TestEventHandler_Create(t *testing.T) {
 		{
 			name: "valid request",
 			body: map[string]interface{}{
-				"name":       "New Event",
-				"venue_id":   "venue-1",
-				"start_time": time.Now().Add(24 * time.Hour).Format(time.RFC3339),
-				"end_time":   time.Now().Add(48 * time.Hour).Format(time.RFC3339),
+				"name":             "New Event",
+				"venue_name":       "Test Venue",
+				"booking_start_at": time.Now().Add(24 * time.Hour).Format(time.RFC3339),
+				"booking_end_at":   time.Now().Add(48 * time.Hour).Format(time.RFC3339),
 			},
 			wantStatus: http.StatusCreated,
 		},
 		{
 			name: "missing name",
 			body: map[string]interface{}{
-				"venue_id":   "venue-1",
-				"start_time": time.Now().Add(24 * time.Hour).Format(time.RFC3339),
-				"end_time":   time.Now().Add(48 * time.Hour).Format(time.RFC3339),
+				"venue_name":       "Test Venue",
+				"booking_start_at": time.Now().Add(24 * time.Hour).Format(time.RFC3339),
+				"booking_end_at":   time.Now().Add(48 * time.Hour).Format(time.RFC3339),
 			},
 			wantStatus: http.StatusBadRequest,
 		},

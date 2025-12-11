@@ -8,7 +8,6 @@ import (
 func TestCreateEventRequest_Validate(t *testing.T) {
 	futureTime := time.Now().Add(24 * time.Hour)
 	futureEndTime := time.Now().Add(48 * time.Hour)
-	pastTime := time.Now().Add(-24 * time.Hour)
 
 	tests := []struct {
 		name    string
@@ -19,75 +18,45 @@ func TestCreateEventRequest_Validate(t *testing.T) {
 		{
 			name: "valid request",
 			req: CreateEventRequest{
-				Name:      "Concert",
-				VenueID:   "venue-123",
-				StartTime: futureTime,
-				EndTime:   futureEndTime,
+				Name: "Concert",
 			},
 			want:    true,
 			wantMsg: "",
 		},
 		{
-			name: "missing name",
+			name: "valid request with booking times",
 			req: CreateEventRequest{
-				VenueID:   "venue-123",
-				StartTime: futureTime,
-				EndTime:   futureEndTime,
+				Name:           "Concert",
+				BookingStartAt: &futureTime,
+				BookingEndAt:   &futureEndTime,
 			},
+			want:    true,
+			wantMsg: "",
+		},
+		{
+			name:    "missing name",
+			req:     CreateEventRequest{},
 			want:    false,
 			wantMsg: "Event name is required",
 		},
 		{
-			name: "missing venue_id",
+			name: "negative max_tickets_per_user",
 			req: CreateEventRequest{
-				Name:      "Concert",
-				StartTime: futureTime,
-				EndTime:   futureEndTime,
+				Name:              "Concert",
+				MaxTicketsPerUser: -1,
 			},
 			want:    false,
-			wantMsg: "Venue ID is required",
+			wantMsg: "Max tickets per user cannot be negative",
 		},
 		{
-			name: "missing start_time",
+			name: "booking_end_at before booking_start_at",
 			req: CreateEventRequest{
-				Name:    "Concert",
-				VenueID: "venue-123",
-				EndTime: futureEndTime,
+				Name:           "Concert",
+				BookingStartAt: &futureEndTime,
+				BookingEndAt:   &futureTime,
 			},
 			want:    false,
-			wantMsg: "Start time is required",
-		},
-		{
-			name: "missing end_time",
-			req: CreateEventRequest{
-				Name:      "Concert",
-				VenueID:   "venue-123",
-				StartTime: futureTime,
-			},
-			want:    false,
-			wantMsg: "End time is required",
-		},
-		{
-			name: "end_time before start_time",
-			req: CreateEventRequest{
-				Name:      "Concert",
-				VenueID:   "venue-123",
-				StartTime: futureEndTime,
-				EndTime:   futureTime,
-			},
-			want:    false,
-			wantMsg: "End time must be after start time",
-		},
-		{
-			name: "start_time in the past",
-			req: CreateEventRequest{
-				Name:      "Concert",
-				VenueID:   "venue-123",
-				StartTime: pastTime,
-				EndTime:   futureTime,
-			},
-			want:    false,
-			wantMsg: "Start time must be in the future",
+			wantMsg: "Booking end time must be after booking start time",
 		},
 	}
 
@@ -107,6 +76,7 @@ func TestCreateEventRequest_Validate(t *testing.T) {
 func TestUpdateEventRequest_Validate(t *testing.T) {
 	futureTime := time.Now().Add(24 * time.Hour)
 	futureEndTime := time.Now().Add(48 * time.Hour)
+	negativeValue := -1
 
 	tests := []struct {
 		name    string
@@ -133,26 +103,34 @@ func TestUpdateEventRequest_Validate(t *testing.T) {
 		{
 			name: "valid time update",
 			req: UpdateEventRequest{
-				StartTime: futureTime,
-				EndTime:   futureEndTime,
+				BookingStartAt: &futureTime,
+				BookingEndAt:   &futureEndTime,
 			},
 			want:    true,
 			wantMsg: "",
 		},
 		{
-			name:    "empty request",
+			name:    "empty request is valid",
 			req:     UpdateEventRequest{},
-			want:    false,
-			wantMsg: "At least one field must be provided for update",
+			want:    true,
+			wantMsg: "",
 		},
 		{
-			name: "end_time before start_time",
+			name: "booking_end_at before booking_start_at",
 			req: UpdateEventRequest{
-				StartTime: futureEndTime,
-				EndTime:   futureTime,
+				BookingStartAt: &futureEndTime,
+				BookingEndAt:   &futureTime,
 			},
 			want:    false,
-			wantMsg: "End time must be after start time",
+			wantMsg: "Booking end time must be after booking start time",
+		},
+		{
+			name: "negative max_tickets_per_user",
+			req: UpdateEventRequest{
+				MaxTicketsPerUser: &negativeValue,
+			},
+			want:    false,
+			wantMsg: "Max tickets per user cannot be negative",
 		},
 	}
 

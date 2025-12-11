@@ -11,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/prohmpiriya/booking-rush-10k-rps/backend-payment/internal/domain"
 	"github.com/prohmpiriya/booking-rush-10k-rps/backend-payment/internal/dto"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-payment/internal/gateway"
 	"github.com/prohmpiriya/booking-rush-10k-rps/backend-payment/internal/service"
 )
 
@@ -113,11 +114,59 @@ func (m *mockPaymentService) CancelPayment(ctx context.Context, paymentID string
 	return payment, nil
 }
 
+// mockPaymentGateway implements gateway.PaymentGateway for testing
+type mockPaymentGateway struct{}
+
+func newMockPaymentGateway() *mockPaymentGateway {
+	return &mockPaymentGateway{}
+}
+
+func (m *mockPaymentGateway) Charge(ctx context.Context, req *gateway.ChargeRequest) (*gateway.ChargeResponse, error) {
+	return &gateway.ChargeResponse{
+		Success:       true,
+		TransactionID: "mock-txn-" + req.PaymentID,
+		Status:        "completed",
+	}, nil
+}
+
+func (m *mockPaymentGateway) Refund(ctx context.Context, transactionID string, amount float64) error {
+	return nil
+}
+
+func (m *mockPaymentGateway) GetTransaction(ctx context.Context, transactionID string) (*gateway.TransactionInfo, error) {
+	return &gateway.TransactionInfo{
+		TransactionID: transactionID,
+		Status:        "completed",
+	}, nil
+}
+
+func (m *mockPaymentGateway) CreatePaymentIntent(ctx context.Context, req *gateway.PaymentIntentRequest) (*gateway.PaymentIntentResponse, error) {
+	return &gateway.PaymentIntentResponse{
+		PaymentIntentID: "pi_mock_" + req.PaymentID,
+		ClientSecret:    "pi_mock_" + req.PaymentID + "_secret_mock",
+		Status:          "requires_payment_method",
+		Amount:          req.Amount,
+		Currency:        req.Currency,
+	}, nil
+}
+
+func (m *mockPaymentGateway) ConfirmPaymentIntent(ctx context.Context, paymentIntentID string) (*gateway.PaymentIntentResponse, error) {
+	return &gateway.PaymentIntentResponse{
+		PaymentIntentID: paymentIntentID,
+		Status:          "succeeded",
+	}, nil
+}
+
+func (m *mockPaymentGateway) Name() string {
+	return "mock"
+}
+
 func setupTestRouter(svc service.PaymentService) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 
-	handler := NewPaymentHandler(svc)
+	gw := newMockPaymentGateway()
+	handler := NewPaymentHandler(svc, gw)
 	payments := router.Group("/api/v1/payments")
 	{
 		payments.POST("", handler.CreatePayment)

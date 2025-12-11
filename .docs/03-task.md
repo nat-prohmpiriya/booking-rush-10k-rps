@@ -900,7 +900,7 @@
 
 ---
 
-## Phase 5: NestJS Services
+## [ ] Phase 5: NestJS Services
 
 **Goal:** Implement Notification and Analytics services with NestJS + MongoDB
 
@@ -1031,7 +1031,7 @@
 
 ---
 
-## Phase 6: Virtual Queue & Advanced Features
+##[ ]  Phase 6: Virtual Queue & Advanced Features
 
 **Goal:** Implement virtual queue and audit logging
 
@@ -1145,7 +1145,7 @@
 
 ---
 
-## Phase [ ] 7: Frontend
+## [ ] Phase 7: Frontend
 
 **Goal:** User-facing web application
 
@@ -1254,33 +1254,33 @@
 
 ---
 
-### [ ]  P7-08: Booking Flow - Checkout & Payment
+### [x]  P7-08: Booking Flow - Checkout & Payment
 | Field | Value |
 |-------|-------|
 | **Description** | Create Checkout page |
 | **Technical Context** | `frontend-web/app/events/[slug]/payment/page.tsx` |
 | **Acceptance Criteria** | - Show order summary<br>- Countdown timer (10 min)<br>- Payment form (mock)<br>- Handle timeout |
 
-- [ ] Create payment page
-- [ ] Show order summary
-- [ ] Implement countdown timer
-- [ ] Create payment form
-- [ ] Handle payment submission
-- [ ] Handle timeout redirect
+- [x] Create payment page
+- [x] Show order summary
+- [x] Implement countdown timer
+- [x] Create payment form
+- [x] Handle payment submission
+- [x] Handle timeout redirect
 
 ---
 
-### [ ]  P7-09: Booking Confirmation
+### [x]  P7-09: Booking Confirmation
 | Field | Value |
 |-------|-------|
 | **Description** | Create confirmation page |
 | **Technical Context** | `frontend-web/app/bookings/[id]/page.tsx` |
 | **Acceptance Criteria** | - Show booking details<br>- Show E-Ticket (QR code)<br>- Download option |
 
-- [ ] Create confirmation page
-- [ ] Display booking details
-- [ ] Generate QR code
-- [ ] Add download button
+- [x] Create confirmation page
+- [x] Display booking details
+- [x] Generate QR code
+- [x] Add download button
 
 ---
 
@@ -1306,7 +1306,7 @@
 | **Technical Context** | `frontend-web/app/bookings/` |
 | **Acceptance Criteria** | - Booking history list<br>- Pending bookings with "Resume Payment"<br>- Profile settings |
 
-- [ ] Create booking history page
+- [x] Create booking history page
 - [ ] Show pending bookings with resume option
 - [ ] Create profile settings page
 - [ ] Handle profile update
@@ -1317,7 +1317,7 @@
 
 ---
 
-## Phase 8: Observability
+## [ ] Phase 8: Observability
 
 **Goal:** Production-grade monitoring with unified OTel stack
 
@@ -1450,7 +1450,7 @@
 
 ---
 
-## Phase 9: Production Hardening
+## [ ] Phase 9: Production Hardening
 
 **Goal:** Ready for production deployment
 
@@ -1558,7 +1558,7 @@
 
 
 
-## Phase 10: Admin UI
+## [ ] Phase 10: Admin UI
 
 **Goal:** Admin dashboard for event organizers to manage events, zones, and monitor sales
 

@@ -119,7 +119,15 @@ function BookingCard({ booking }: { booking: BookingWithEvent }) {
 
   return (
     <Link href={`/my-bookings/${booking.id}`} className="block">
-      <div className="group glass rounded-xl p-4 sm:p-6 border border-border/50 hover:border-primary/50 transition-all duration-300 cursor-pointer">
+      <div className="group glass rounded-xl p-4 sm:p-6 border border-border/50 hover:border-primary/50 transition-all duration-300 cursor-pointer relative">
+        {/* Status Badge - Top Right Corner */}
+        <div className="absolute top-3 right-3 sm:top-4 sm:right-4 z-10">
+          <Badge className={`${statusConfig.color} border`}>
+            <StatusIcon className="h-3 w-3 mr-1" />
+            {statusConfig.label}
+          </Badge>
+        </div>
+
         <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
           {/* Event Image */}
           <div className="relative h-40 sm:h-40 sm:w-56 shrink-0 overflow-hidden rounded-lg">
@@ -128,12 +136,6 @@ function BookingCard({ booking }: { booking: BookingWithEvent }) {
               alt={booking.event?.title || "Event"}
               className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
             />
-            <div className="absolute top-2 right-2">
-              <Badge className={`${statusConfig.color} border`}>
-                <StatusIcon className="h-3 w-3 mr-1" />
-                {statusConfig.label}
-              </Badge>
-            </div>
           </div>
 
           {/* Booking Info */}
