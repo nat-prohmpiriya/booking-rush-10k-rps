@@ -89,47 +89,65 @@ func (m *MockQueueRepository) RemoveUserFromQueue(ctx context.Context, eventID, 
 // Ensure MockQueueRepository implements QueueRepository
 var _ repository.QueueRepository = (*MockQueueRepository)(nil)
 
+func (m *MockQueueRepository) CountActiveQueuePasses(ctx context.Context, eventID string) (int64, error) {
+	args := m.Called(ctx, eventID)
+	return args.Get(0).(int64), args.Error(1)
+}
+
+func (m *MockQueueRepository) GetEventQueueConfig(ctx context.Context, eventID string) (*repository.EventQueueConfig, error) {
+	args := m.Called(ctx, eventID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*repository.EventQueueConfig), args.Error(1)
+}
+
+func (m *MockQueueRepository) SetEventQueueConfig(ctx context.Context, eventID string, config *repository.EventQueueConfig) error {
+	args := m.Called(ctx, eventID, config)
+	return args.Error(0)
+}
+
 func TestNewQueueReleaseWorker(t *testing.T) {
 	mockRepo := new(MockQueueRepository)
 
 	t.Run("creates worker with default config", func(t *testing.T) {
 		worker := NewQueueReleaseWorker(nil, mockRepo, nil)
 		assert.NotNil(t, worker)
-		assert.Equal(t, 100, worker.GetBatchSize())
+		assert.Equal(t, 500, worker.GetDefaultMaxConcurrent())
 	})
 
 	t.Run("creates worker with custom config", func(t *testing.T) {
 		cfg := &QueueReleaseWorkerConfig{
-			BatchSize:       200,
-			ReleaseInterval: 5 * time.Second,
-			QueuePassTTL:    10 * time.Minute,
-			JWTSecret:       "custom-secret",
+			DefaultMaxConcurrent: 1000,
+			ReleaseInterval:      5 * time.Second,
+			DefaultQueuePassTTL:  10 * time.Minute,
+			JWTSecret:            "custom-secret",
 		}
 		worker := NewQueueReleaseWorker(cfg, mockRepo, nil)
 		assert.NotNil(t, worker)
-		assert.Equal(t, 200, worker.GetBatchSize())
+		assert.Equal(t, 1000, worker.GetDefaultMaxConcurrent())
 	})
 
 	t.Run("uses defaults for invalid config values", func(t *testing.T) {
 		cfg := &QueueReleaseWorkerConfig{
-			BatchSize:       -1,
-			ReleaseInterval: 0,
-			QueuePassTTL:    0,
-			JWTSecret:       "",
+			DefaultMaxConcurrent: -1,
+			ReleaseInterval:      0,
+			DefaultQueuePassTTL:  0,
+			JWTSecret:            "",
 		}
 		worker := NewQueueReleaseWorker(cfg, mockRepo, nil)
 		assert.NotNil(t, worker)
-		assert.Equal(t, 100, worker.GetBatchSize())
+		assert.Equal(t, 500, worker.GetDefaultMaxConcurrent())
 	})
 }
 
 func TestQueueReleaseWorker_ReleaseFromQueueOnce(t *testing.T) {
-	t.Run("releases users successfully", func(t *testing.T) {
+	t.Run("releases users based on dynamic capacity", func(t *testing.T) {
 		mockRepo := new(MockQueueRepository)
 		cfg := &QueueReleaseWorkerConfig{
-			BatchSize:    100,
-			QueuePassTTL: 5 * time.Minute,
-			JWTSecret:    "test-secret",
+			DefaultMaxConcurrent: 500,
+			DefaultQueuePassTTL:  5 * time.Minute,
+			JWTSecret:            "test-secret",
 		}
 		worker := NewQueueReleaseWorker(cfg, mockRepo, nil)
 
@@ -137,7 +155,11 @@ func TestQueueReleaseWorker_ReleaseFromQueueOnce(t *testing.T) {
 		eventID := "event-123"
 		userIDs := []string{"user-1", "user-2", "user-3"}
 
-		mockRepo.On("PopUsersFromQueue", ctx, eventID, int64(100)).Return(userIDs, nil)
+		// Config not found, use defaults (500 max)
+		mockRepo.On("GetEventQueueConfig", ctx, eventID).Return(nil, nil)
+		// 100 active, so release 400 (but only 3 in queue)
+		mockRepo.On("CountActiveQueuePasses", ctx, eventID).Return(int64(100), nil)
+		mockRepo.On("PopUsersFromQueue", ctx, eventID, int64(400)).Return(userIDs, nil)
 		mockRepo.On("StoreQueuePass", ctx, eventID, mock.AnythingOfType("string"), mock.AnythingOfType("string"), 300).Return(nil)
 
 		releasedUsers, err := worker.ReleaseFromQueueOnce(ctx, eventID)
@@ -155,15 +177,21 @@ func TestQueueReleaseWorker_ReleaseFromQueueOnce(t *testing.T) {
 		mockRepo.AssertExpectations(t)
 	})
 
-	t.Run("returns empty when no users in queue", func(t *testing.T) {
+	t.Run("returns empty when at capacity", func(t *testing.T) {
 		mockRepo := new(MockQueueRepository)
-		cfg := DefaultQueueReleaseWorkerConfig()
+		cfg := &QueueReleaseWorkerConfig{
+			DefaultMaxConcurrent: 500,
+			DefaultQueuePassTTL:  5 * time.Minute,
+			JWTSecret:            "test-secret",
+		}
 		worker := NewQueueReleaseWorker(cfg, mockRepo, nil)
 
 		ctx := context.Background()
 		eventID := "event-123"
 
-		mockRepo.On("PopUsersFromQueue", ctx, eventID, int64(100)).Return([]string{}, nil)
+		mockRepo.On("GetEventQueueConfig", ctx, eventID).Return(nil, nil)
+		// At capacity (500 active, 500 max)
+		mockRepo.On("CountActiveQueuePasses", ctx, eventID).Return(int64(500), nil)
 
 		releasedUsers, err := worker.ReleaseFromQueueOnce(ctx, eventID)
 
@@ -173,7 +201,7 @@ func TestQueueReleaseWorker_ReleaseFromQueueOnce(t *testing.T) {
 		mockRepo.AssertExpectations(t)
 	})
 
-	t.Run("handles pop error gracefully", func(t *testing.T) {
+	t.Run("returns empty when no users in queue", func(t *testing.T) {
 		mockRepo := new(MockQueueRepository)
 		cfg := DefaultQueueReleaseWorkerConfig()
 		worker := NewQueueReleaseWorker(cfg, mockRepo, nil)
@@ -181,7 +209,28 @@ func TestQueueReleaseWorker_ReleaseFromQueueOnce(t *testing.T) {
 		ctx := context.Background()
 		eventID := "event-123"
 
-		mockRepo.On("PopUsersFromQueue", ctx, eventID, int64(100)).Return(nil, assert.AnError)
+		mockRepo.On("GetEventQueueConfig", ctx, eventID).Return(nil, nil)
+		mockRepo.On("CountActiveQueuePasses", ctx, eventID).Return(int64(0), nil)
+		mockRepo.On("PopUsersFromQueue", ctx, eventID, int64(500)).Return([]string{}, nil)
+
+		releasedUsers, err := worker.ReleaseFromQueueOnce(ctx, eventID)
+
+		assert.NoError(t, err)
+		assert.Len(t, releasedUsers, 0)
+
+		mockRepo.AssertExpectations(t)
+	})
+
+	t.Run("handles count error gracefully", func(t *testing.T) {
+		mockRepo := new(MockQueueRepository)
+		cfg := DefaultQueueReleaseWorkerConfig()
+		worker := NewQueueReleaseWorker(cfg, mockRepo, nil)
+
+		ctx := context.Background()
+		eventID := "event-123"
+
+		mockRepo.On("GetEventQueueConfig", ctx, eventID).Return(nil, nil)
+		mockRepo.On("CountActiveQueuePasses", ctx, eventID).Return(int64(0), assert.AnError)
 
 		releasedUsers, err := worker.ReleaseFromQueueOnce(ctx, eventID)
 
@@ -191,29 +240,30 @@ func TestQueueReleaseWorker_ReleaseFromQueueOnce(t *testing.T) {
 		mockRepo.AssertExpectations(t)
 	})
 
-	t.Run("continues releasing when store fails for some users", func(t *testing.T) {
+	t.Run("uses custom event config", func(t *testing.T) {
 		mockRepo := new(MockQueueRepository)
-		cfg := &QueueReleaseWorkerConfig{
-			BatchSize:    100,
-			QueuePassTTL: 5 * time.Minute,
-			JWTSecret:    "test-secret",
-		}
+		cfg := DefaultQueueReleaseWorkerConfig()
 		worker := NewQueueReleaseWorker(cfg, mockRepo, nil)
 
 		ctx := context.Background()
 		eventID := "event-123"
-		userIDs := []string{"user-1", "user-2", "user-3"}
 
-		mockRepo.On("PopUsersFromQueue", ctx, eventID, int64(100)).Return(userIDs, nil)
-		// First user fails, others succeed
-		mockRepo.On("StoreQueuePass", ctx, eventID, "user-1", mock.AnythingOfType("string"), 300).Return(assert.AnError).Once()
-		mockRepo.On("StoreQueuePass", ctx, eventID, "user-2", mock.AnythingOfType("string"), 300).Return(nil).Once()
-		mockRepo.On("StoreQueuePass", ctx, eventID, "user-3", mock.AnythingOfType("string"), 300).Return(nil).Once()
+		// Custom config: 100 max, 10 min TTL
+		customConfig := &repository.EventQueueConfig{
+			MaxConcurrentBookings: 100,
+			QueuePassTTLMinutes:   10,
+		}
+		mockRepo.On("GetEventQueueConfig", ctx, eventID).Return(customConfig, nil)
+		// 50 active, so release 50
+		mockRepo.On("CountActiveQueuePasses", ctx, eventID).Return(int64(50), nil)
+		mockRepo.On("PopUsersFromQueue", ctx, eventID, int64(50)).Return([]string{"user-1"}, nil)
+		// TTL should be 10 min = 600 seconds
+		mockRepo.On("StoreQueuePass", ctx, eventID, mock.AnythingOfType("string"), mock.AnythingOfType("string"), 600).Return(nil)
 
 		releasedUsers, err := worker.ReleaseFromQueueOnce(ctx, eventID)
 
 		assert.NoError(t, err)
-		assert.Len(t, releasedUsers, 2) // Only 2 succeeded
+		assert.Len(t, releasedUsers, 1)
 
 		mockRepo.AssertExpectations(t)
 	})
@@ -224,9 +274,9 @@ func TestQueueReleaseWorker_GenerateQueuePass(t *testing.T) {
 		mockRepo := new(MockQueueRepository)
 		secret := "test-secret-key"
 		cfg := &QueueReleaseWorkerConfig{
-			BatchSize:    100,
-			QueuePassTTL: 5 * time.Minute,
-			JWTSecret:    secret,
+			DefaultMaxConcurrent: 500,
+			DefaultQueuePassTTL:  5 * time.Minute,
+			JWTSecret:            secret,
 		}
 		worker := NewQueueReleaseWorker(cfg, mockRepo, nil)
 
@@ -250,31 +300,29 @@ func TestQueueReleaseWorker_GenerateQueuePass(t *testing.T) {
 		assert.Equal(t, "queue_pass", claims.Purpose)
 		assert.Equal(t, "queue-release-worker", claims.Issuer)
 	})
-}
 
-func TestQueueReleaseWorker_SetBatchSize(t *testing.T) {
-	mockRepo := new(MockQueueRepository)
-	worker := NewQueueReleaseWorker(nil, mockRepo, nil)
+	t.Run("generates JWT with custom TTL", func(t *testing.T) {
+		mockRepo := new(MockQueueRepository)
+		secret := "test-secret-key"
+		cfg := &QueueReleaseWorkerConfig{
+			JWTSecret: secret,
+		}
+		worker := NewQueueReleaseWorker(cfg, mockRepo, nil)
 
-	assert.Equal(t, 100, worker.GetBatchSize())
+		queuePass, expiresAt, err := worker.generateQueuePassWithTTL("user-123", "event-456", 10*time.Minute)
 
-	worker.SetBatchSize(200)
-	assert.Equal(t, 200, worker.GetBatchSize())
-
-	// Invalid batch size should not change
-	worker.SetBatchSize(0)
-	assert.Equal(t, 200, worker.GetBatchSize())
-
-	worker.SetBatchSize(-10)
-	assert.Equal(t, 200, worker.GetBatchSize())
+		assert.NoError(t, err)
+		assert.NotEmpty(t, queuePass)
+		assert.WithinDuration(t, time.Now().Add(10*time.Minute), expiresAt, time.Second)
+	})
 }
 
 func TestQueueReleaseWorker_GetMetrics(t *testing.T) {
 	mockRepo := new(MockQueueRepository)
 	cfg := &QueueReleaseWorkerConfig{
-		BatchSize:    100,
-		QueuePassTTL: 5 * time.Minute,
-		JWTSecret:    "test-secret",
+		DefaultMaxConcurrent: 500,
+		DefaultQueuePassTTL:  5 * time.Minute,
+		JWTSecret:            "test-secret",
 	}
 	worker := NewQueueReleaseWorker(cfg, mockRepo, nil)
 
@@ -289,7 +337,9 @@ func TestQueueReleaseWorker_GetMetrics(t *testing.T) {
 	eventID := "event-123"
 	userIDs := []string{"user-1", "user-2"}
 
-	mockRepo.On("PopUsersFromQueue", ctx, eventID, int64(100)).Return(userIDs, nil)
+	mockRepo.On("GetEventQueueConfig", ctx, eventID).Return(nil, nil)
+	mockRepo.On("CountActiveQueuePasses", ctx, eventID).Return(int64(0), nil)
+	mockRepo.On("PopUsersFromQueue", ctx, eventID, int64(500)).Return(userIDs, nil)
 	mockRepo.On("StoreQueuePass", ctx, eventID, mock.AnythingOfType("string"), mock.AnythingOfType("string"), 300).Return(nil)
 
 	_, _ = worker.ReleaseFromQueueOnce(ctx, eventID)
@@ -303,9 +353,9 @@ func TestQueueReleaseWorker_GetMetrics(t *testing.T) {
 func TestDefaultQueueReleaseWorkerConfig(t *testing.T) {
 	cfg := DefaultQueueReleaseWorkerConfig()
 
-	assert.Equal(t, 100, cfg.BatchSize)
+	assert.Equal(t, 500, cfg.DefaultMaxConcurrent)
 	assert.Equal(t, 1*time.Second, cfg.ReleaseInterval)
-	assert.Equal(t, 5*time.Minute, cfg.QueuePassTTL)
+	assert.Equal(t, 5*time.Minute, cfg.DefaultQueuePassTTL)
 	assert.NotEmpty(t, cfg.JWTSecret)
 }
 

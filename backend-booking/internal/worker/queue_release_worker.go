@@ -9,29 +9,30 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking/internal/domain"
 	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking/internal/repository"
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/logger"
 )
 
 // QueueReleaseWorkerConfig holds configuration for the queue release worker
 type QueueReleaseWorkerConfig struct {
-	// BatchSize is the number of users to release per batch (default: 100)
-	BatchSize int
 	// ReleaseInterval is the time between release batches (default: 1 second)
 	ReleaseInterval time.Duration
-	// QueuePassTTL is the TTL for queue pass tokens (default: 5 minutes)
-	QueuePassTTL time.Duration
 	// JWTSecret is the secret for signing queue pass JWTs
 	JWTSecret string
+	// DefaultMaxConcurrent is used when event config is not set (default: 500)
+	DefaultMaxConcurrent int
+	// DefaultQueuePassTTL is used when event config is not set (default: 5 minutes)
+	DefaultQueuePassTTL time.Duration
 }
 
 // DefaultQueueReleaseWorkerConfig returns default configuration
 func DefaultQueueReleaseWorkerConfig() *QueueReleaseWorkerConfig {
 	return &QueueReleaseWorkerConfig{
-		BatchSize:       100,
-		ReleaseInterval: 1 * time.Second,
-		QueuePassTTL:    5 * time.Minute,
-		JWTSecret:       "queue-pass-secret-key",
+		ReleaseInterval:      1 * time.Second,
+		JWTSecret:            "queue-pass-secret-key",
+		DefaultMaxConcurrent: domain.DefaultMaxConcurrentBookings,
+		DefaultQueuePassTTL:  time.Duration(domain.DefaultQueuePassTTLMinutes) * time.Minute,
 	}
 }
 
@@ -54,6 +55,12 @@ type QueueReleaseWorker struct {
 	totalReleased    int64
 	lastReleaseTime  time.Time
 	lastReleaseCount int
+
+	// Cache for event configs (to reduce Redis calls)
+	configCache     map[string]*repository.EventQueueConfig
+	configCacheMu   sync.RWMutex
+	configCacheTTL  time.Duration
+	configCacheTime map[string]time.Time
 }
 
 // NewQueueReleaseWorker creates a new queue release worker
@@ -65,23 +72,26 @@ func NewQueueReleaseWorker(
 	if cfg == nil {
 		cfg = DefaultQueueReleaseWorkerConfig()
 	}
-	if cfg.BatchSize <= 0 {
-		cfg.BatchSize = 100
-	}
 	if cfg.ReleaseInterval <= 0 {
 		cfg.ReleaseInterval = 1 * time.Second
-	}
-	if cfg.QueuePassTTL <= 0 {
-		cfg.QueuePassTTL = 5 * time.Minute
 	}
 	if cfg.JWTSecret == "" {
 		cfg.JWTSecret = "queue-pass-secret-key"
 	}
+	if cfg.DefaultMaxConcurrent <= 0 {
+		cfg.DefaultMaxConcurrent = domain.DefaultMaxConcurrentBookings
+	}
+	if cfg.DefaultQueuePassTTL <= 0 {
+		cfg.DefaultQueuePassTTL = time.Duration(domain.DefaultQueuePassTTLMinutes) * time.Minute
+	}
 
 	return &QueueReleaseWorker{
-		config:    cfg,
-		queueRepo: queueRepo,
-		log:       log,
+		config:          cfg,
+		queueRepo:       queueRepo,
+		log:             log,
+		configCache:     make(map[string]*repository.EventQueueConfig),
+		configCacheTTL:  30 * time.Second, // Cache config for 30 seconds
+		configCacheTime: make(map[string]time.Time),
 	}
 }
 
@@ -90,8 +100,8 @@ func (w *QueueReleaseWorker) Start(ctx context.Context) {
 	ticker := time.NewTicker(w.config.ReleaseInterval)
 	defer ticker.Stop()
 
-	w.log.Info(fmt.Sprintf("Queue release worker started (batch size: %d, interval: %v)",
-		w.config.BatchSize, w.config.ReleaseInterval))
+	w.log.Info(fmt.Sprintf("Queue release worker started (default max concurrent: %d, interval: %v)",
+		w.config.DefaultMaxConcurrent, w.config.ReleaseInterval))
 
 	for {
 		select {
@@ -128,10 +138,29 @@ func (w *QueueReleaseWorker) processAllQueues(ctx context.Context) {
 	}
 }
 
-// releaseFromQueue releases a batch of users from a specific event queue
+// releaseFromQueue releases users from a specific event queue using dynamic capacity
 func (w *QueueReleaseWorker) releaseFromQueue(ctx context.Context, eventID string) {
+	// Get event queue config (cached)
+	config := w.getEventConfig(ctx, eventID)
+	maxConcurrent := config.MaxConcurrentBookings
+	queuePassTTL := time.Duration(config.QueuePassTTLMinutes) * time.Minute
+
+	// Count current active queue passes
+	activeCount, err := w.queueRepo.CountActiveQueuePasses(ctx, eventID)
+	if err != nil {
+		w.log.Error(fmt.Sprintf("Failed to count active queue passes for %s: %v", eventID, err))
+		return
+	}
+
+	// Calculate how many users to release
+	releaseCount := int64(maxConcurrent) - activeCount
+	if releaseCount <= 0 {
+		// At capacity, no need to release
+		return
+	}
+
 	// Pop users from queue
-	userIDs, err := w.queueRepo.PopUsersFromQueue(ctx, eventID, int64(w.config.BatchSize))
+	userIDs, err := w.queueRepo.PopUsersFromQueue(ctx, eventID, releaseCount)
 	if err != nil {
 		w.log.Error(fmt.Sprintf("Failed to pop users from queue %s: %v", eventID, err))
 		return
@@ -141,19 +170,20 @@ func (w *QueueReleaseWorker) releaseFromQueue(ctx context.Context, eventID strin
 		return
 	}
 
-	w.log.Info(fmt.Sprintf("Releasing %d users from queue %s", len(userIDs), eventID))
+	w.log.Info(fmt.Sprintf("Releasing %d users from queue %s (active: %d, max: %d)",
+		len(userIDs), eventID, activeCount, maxConcurrent))
 
 	// Generate and store queue passes for each user
 	releasedCount := 0
+	ttlSeconds := int(queuePassTTL.Seconds())
 	for _, userID := range userIDs {
-		queuePass, expiresAt, err := w.generateQueuePass(userID, eventID)
+		queuePass, expiresAt, err := w.generateQueuePassWithTTL(userID, eventID, queuePassTTL)
 		if err != nil {
 			w.log.Error(fmt.Sprintf("Failed to generate queue pass for user %s: %v", userID, err))
 			continue
 		}
 
 		// Store queue pass in Redis
-		ttlSeconds := int(w.config.QueuePassTTL.Seconds())
 		if err := w.queueRepo.StoreQueuePass(ctx, eventID, userID, queuePass, ttlSeconds); err != nil {
 			w.log.Error(fmt.Sprintf("Failed to store queue pass for user %s: %v", userID, err))
 			continue
@@ -177,6 +207,45 @@ func (w *QueueReleaseWorker) releaseFromQueue(ctx context.Context, eventID strin
 	}
 }
 
+// getEventConfig gets event queue config with caching
+func (w *QueueReleaseWorker) getEventConfig(ctx context.Context, eventID string) *repository.EventQueueConfig {
+	// Check cache first
+	w.configCacheMu.RLock()
+	if cached, ok := w.configCache[eventID]; ok {
+		if cacheTime, ok := w.configCacheTime[eventID]; ok && time.Since(cacheTime) < w.configCacheTTL {
+			w.configCacheMu.RUnlock()
+			return cached
+		}
+	}
+	w.configCacheMu.RUnlock()
+
+	// Fetch from Redis
+	config, err := w.queueRepo.GetEventQueueConfig(ctx, eventID)
+	if err != nil || config == nil {
+		// Use defaults
+		config = &repository.EventQueueConfig{
+			MaxConcurrentBookings: w.config.DefaultMaxConcurrent,
+			QueuePassTTLMinutes:   int(w.config.DefaultQueuePassTTL.Minutes()),
+		}
+	}
+
+	// Apply defaults if values are zero
+	if config.MaxConcurrentBookings <= 0 {
+		config.MaxConcurrentBookings = w.config.DefaultMaxConcurrent
+	}
+	if config.QueuePassTTLMinutes <= 0 {
+		config.QueuePassTTLMinutes = int(w.config.DefaultQueuePassTTL.Minutes())
+	}
+
+	// Update cache
+	w.configCacheMu.Lock()
+	w.configCache[eventID] = config
+	w.configCacheTime[eventID] = time.Now()
+	w.configCacheMu.Unlock()
+
+	return config
+}
+
 // QueuePassClaims represents the claims for a queue pass JWT
 type QueuePassClaims struct {
 	UserID  string `json:"user_id"`
@@ -185,10 +254,10 @@ type QueuePassClaims struct {
 	jwt.RegisteredClaims
 }
 
-// generateQueuePass generates a signed JWT queue pass token
-func (w *QueueReleaseWorker) generateQueuePass(userID, eventID string) (string, time.Time, error) {
+// generateQueuePassWithTTL generates a signed JWT queue pass token with custom TTL
+func (w *QueueReleaseWorker) generateQueuePassWithTTL(userID, eventID string, ttl time.Duration) (string, time.Time, error) {
 	now := time.Now()
-	expiresAt := now.Add(w.config.QueuePassTTL)
+	expiresAt := now.Add(ttl)
 
 	claims := QueuePassClaims{
 		UserID:  userID,
@@ -213,6 +282,11 @@ func (w *QueueReleaseWorker) generateQueuePass(userID, eventID string) (string, 
 	return signedToken, expiresAt, nil
 }
 
+// generateQueuePass generates a signed JWT queue pass token with default TTL
+func (w *QueueReleaseWorker) generateQueuePass(userID, eventID string) (string, time.Time, error) {
+	return w.generateQueuePassWithTTL(userID, eventID, w.config.DefaultQueuePassTTL)
+}
+
 // generateUniqueID generates a unique ID for JWT
 func generateUniqueID() string {
 	bytes := make([]byte, 16)
@@ -229,10 +303,27 @@ func (w *QueueReleaseWorker) GetMetrics() (totalReleased int64, lastReleaseTime 
 	return w.totalReleased, w.lastReleaseTime, w.lastReleaseCount
 }
 
-// ReleaseFromQueueOnce releases a single batch from a specific queue (for testing)
+// ReleaseFromQueueOnce releases users from a specific queue using dynamic capacity (for testing)
 func (w *QueueReleaseWorker) ReleaseFromQueueOnce(ctx context.Context, eventID string) ([]ReleasedUser, error) {
+	// Get event queue config (cached)
+	config := w.getEventConfig(ctx, eventID)
+	maxConcurrent := config.MaxConcurrentBookings
+	queuePassTTL := time.Duration(config.QueuePassTTLMinutes) * time.Minute
+
+	// Count current active queue passes
+	activeCount, err := w.queueRepo.CountActiveQueuePasses(ctx, eventID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to count active queue passes: %w", err)
+	}
+
+	// Calculate how many users to release
+	releaseCount := int64(maxConcurrent) - activeCount
+	if releaseCount <= 0 {
+		return []ReleasedUser{}, nil // At capacity
+	}
+
 	// Pop users from queue
-	userIDs, err := w.queueRepo.PopUsersFromQueue(ctx, eventID, int64(w.config.BatchSize))
+	userIDs, err := w.queueRepo.PopUsersFromQueue(ctx, eventID, releaseCount)
 	if err != nil {
 		return nil, fmt.Errorf("failed to pop users from queue: %w", err)
 	}
@@ -242,13 +333,13 @@ func (w *QueueReleaseWorker) ReleaseFromQueueOnce(ctx context.Context, eventID s
 	}
 
 	var releasedUsers []ReleasedUser
+	ttlSeconds := int(queuePassTTL.Seconds())
 	for _, userID := range userIDs {
-		queuePass, expiresAt, err := w.generateQueuePass(userID, eventID)
+		queuePass, expiresAt, err := w.generateQueuePassWithTTL(userID, eventID, queuePassTTL)
 		if err != nil {
 			continue
 		}
 
-		ttlSeconds := int(w.config.QueuePassTTL.Seconds())
 		if err := w.queueRepo.StoreQueuePass(ctx, eventID, userID, queuePass, ttlSeconds); err != nil {
 			continue
 		}
@@ -271,14 +362,16 @@ func (w *QueueReleaseWorker) ReleaseFromQueueOnce(ctx context.Context, eventID s
 	return releasedUsers, nil
 }
 
-// SetBatchSize updates the batch size (for dynamic configuration)
-func (w *QueueReleaseWorker) SetBatchSize(size int) {
-	if size > 0 {
-		w.config.BatchSize = size
+// SetEventConfig sets the queue configuration for an event (for testing or admin API)
+func (w *QueueReleaseWorker) SetEventConfig(ctx context.Context, eventID string, maxConcurrent, queuePassTTLMinutes int) error {
+	config := &repository.EventQueueConfig{
+		MaxConcurrentBookings: maxConcurrent,
+		QueuePassTTLMinutes:   queuePassTTLMinutes,
 	}
+	return w.queueRepo.SetEventQueueConfig(ctx, eventID, config)
 }
 
-// GetBatchSize returns the current batch size
-func (w *QueueReleaseWorker) GetBatchSize() int {
-	return w.config.BatchSize
+// GetDefaultMaxConcurrent returns the default max concurrent bookings
+func (w *QueueReleaseWorker) GetDefaultMaxConcurrent() int {
+	return w.config.DefaultMaxConcurrent
 }

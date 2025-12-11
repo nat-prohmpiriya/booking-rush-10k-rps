@@ -66,20 +66,20 @@ func main() {
 	}
 
 	// Get worker configuration from environment or use defaults
-	batchSize := getEnvInt("QUEUE_BATCH_SIZE", 100)
+	defaultMaxConcurrent := getEnvInt("QUEUE_DEFAULT_MAX_CONCURRENT", 500)
 	releaseInterval := getEnvDuration("QUEUE_RELEASE_INTERVAL", 1*time.Second)
-	queuePassTTL := getEnvDuration("QUEUE_PASS_TTL", 5*time.Minute)
+	defaultQueuePassTTL := getEnvDuration("QUEUE_DEFAULT_PASS_TTL", 5*time.Minute)
 	jwtSecret := getEnvString("QUEUE_JWT_SECRET", cfg.JWT.Secret)
 
 	workerCfg := &worker.QueueReleaseWorkerConfig{
-		BatchSize:       batchSize,
-		ReleaseInterval: releaseInterval,
-		QueuePassTTL:    queuePassTTL,
-		JWTSecret:       jwtSecret,
+		DefaultMaxConcurrent: defaultMaxConcurrent,
+		ReleaseInterval:      releaseInterval,
+		DefaultQueuePassTTL:  defaultQueuePassTTL,
+		JWTSecret:            jwtSecret,
 	}
 
-	appLog.Info(fmt.Sprintf("Worker configuration: BatchSize=%d, ReleaseInterval=%v, QueuePassTTL=%v",
-		workerCfg.BatchSize, workerCfg.ReleaseInterval, workerCfg.QueuePassTTL))
+	appLog.Info(fmt.Sprintf("Worker configuration: DefaultMaxConcurrent=%d, ReleaseInterval=%v, DefaultQueuePassTTL=%v",
+		workerCfg.DefaultMaxConcurrent, workerCfg.ReleaseInterval, workerCfg.DefaultQueuePassTTL))
 
 	// Create and start queue release worker
 	queueWorker := worker.NewQueueReleaseWorker(workerCfg, queueRepo, appLog)

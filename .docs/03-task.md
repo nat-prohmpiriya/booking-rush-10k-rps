@@ -1065,34 +1065,34 @@
 
 ---
 
-### [ ]  P6-03: Virtual Queue - Queue Pass Token
+### [x] P6-03: Virtual Queue - Queue Pass Token
 | Field | Value |
 |-------|-------|
 | **Description** | Generate Queue Pass Token when user reaches front |
 | **Technical Context** | `backend-booking-service/internal/service/queue_service.go` |
 | **Acceptance Criteria** | - Generate JWT token when position = 0<br>- Token valid for 5 minutes<br>- Store in Redis for validation |
 
-- [ ] Implement Queue Pass generation
-- [ ] Sign as JWT with expiry
-- [ ] Store in Redis
-- [ ] Return in queue status response
-- [ ] Write tests
+- [x]Implement Queue Pass generation
+- [x]Sign as JWT with expiry
+- [x]Store in Redis
+- [x]Return in queue status response
+- [x]Write tests
 
 ---
 
-### [ ]  P6-04: API Gateway - Queue Pass Validation
+### [x] P6-04: API Gateway - Queue Pass Validation
 | Field | Value |
 |-------|-------|
 | **Description** | Validate Queue Pass in API Gateway |
 | **Technical Context** | `backend-api-gateway/internal/middleware/queue_pass.go` |
 | **Acceptance Criteria** | - Check `X-Queue-Pass` header<br>- Validate token signature and expiry<br>- Bypass rate limit for valid passes<br>- Block users without pass during high traffic |
 
-- [ ] Create Queue Pass middleware
-- [ ] Validate JWT signature
-- [ ] Check expiry
-- [ ] Bypass rate limit if valid
-- [ ] Block if no pass during queue mode
-- [ ] Write tests
+- [x]Create Queue Pass middleware
+- [x]Validate JWT signature
+- [x]Check expiry
+- [x]Bypass rate limit if valid
+- [x]Block if no pass during queue mode
+- [x]Write tests
 
 ---
 

@@ -55,6 +55,21 @@ type QueueRepository interface {
 
 	// RemoveUserFromQueue removes a user from the queue without token verification (for worker use)
 	RemoveUserFromQueue(ctx context.Context, eventID, userID string) error
+
+	// CountActiveQueuePasses counts the number of active (non-expired) queue passes for an event
+	CountActiveQueuePasses(ctx context.Context, eventID string) (int64, error)
+
+	// GetEventQueueConfig gets the queue configuration for an event from Redis cache
+	GetEventQueueConfig(ctx context.Context, eventID string) (*EventQueueConfig, error)
+
+	// SetEventQueueConfig sets the queue configuration for an event in Redis cache
+	SetEventQueueConfig(ctx context.Context, eventID string, config *EventQueueConfig) error
+}
+
+// EventQueueConfig holds queue configuration for an event
+type EventQueueConfig struct {
+	MaxConcurrentBookings int `json:"max_concurrent_bookings"`
+	QueuePassTTLMinutes   int `json:"queue_pass_ttl_minutes"`
 }
 
 // JoinQueueParams contains parameters for joining a queue

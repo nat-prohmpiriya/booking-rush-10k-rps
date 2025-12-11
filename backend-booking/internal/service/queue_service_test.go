@@ -66,6 +66,45 @@ func (m *MockQueueRepository) DeleteQueuePass(ctx context.Context, eventID, user
 	return args.Error(0)
 }
 
+func (m *MockQueueRepository) PopUsersFromQueue(ctx context.Context, eventID string, count int64) ([]string, error) {
+	args := m.Called(ctx, eventID, count)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]string), args.Error(1)
+}
+
+func (m *MockQueueRepository) GetAllQueueEventIDs(ctx context.Context) ([]string, error) {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]string), args.Error(1)
+}
+
+func (m *MockQueueRepository) RemoveUserFromQueue(ctx context.Context, eventID, userID string) error {
+	args := m.Called(ctx, eventID, userID)
+	return args.Error(0)
+}
+
+func (m *MockQueueRepository) CountActiveQueuePasses(ctx context.Context, eventID string) (int64, error) {
+	args := m.Called(ctx, eventID)
+	return args.Get(0).(int64), args.Error(1)
+}
+
+func (m *MockQueueRepository) GetEventQueueConfig(ctx context.Context, eventID string) (*repository.EventQueueConfig, error) {
+	args := m.Called(ctx, eventID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*repository.EventQueueConfig), args.Error(1)
+}
+
+func (m *MockQueueRepository) SetEventQueueConfig(ctx context.Context, eventID string, config *repository.EventQueueConfig) error {
+	args := m.Called(ctx, eventID, config)
+	return args.Error(0)
+}
+
 func TestQueueService_JoinQueue_Success(t *testing.T) {
 	mockRepo := new(MockQueueRepository)
 	service := NewQueueService(mockRepo, &QueueServiceConfig{

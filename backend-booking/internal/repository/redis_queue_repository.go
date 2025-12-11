@@ -325,5 +325,64 @@ func stringSliceToInterface(s []string) []interface{} {
 	return result
 }
 
+// CountActiveQueuePasses counts active queue passes for an event using SCAN
+func (r *RedisQueueRepository) CountActiveQueuePasses(ctx context.Context, eventID string) (int64, error) {
+	pattern := fmt.Sprintf("queue:pass:%s:*", eventID)
+	var count int64
+	var cursor uint64
+
+	for {
+		keys, nextCursor, err := r.client.Scan(ctx, cursor, pattern, 100).Result()
+		if err != nil {
+			return 0, fmt.Errorf("failed to scan queue passes: %w", err)
+		}
+
+		count += int64(len(keys))
+		cursor = nextCursor
+
+		if cursor == 0 {
+			break
+		}
+	}
+
+	return count, nil
+}
+
+// GetEventQueueConfig gets the queue configuration for an event from Redis cache
+func (r *RedisQueueRepository) GetEventQueueConfig(ctx context.Context, eventID string) (*EventQueueConfig, error) {
+	key := fmt.Sprintf("queue:config:%s", eventID)
+	result, err := r.client.HGetAll(ctx, key).Result()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get event queue config: %w", err)
+	}
+
+	if len(result) == 0 {
+		return nil, nil // No config found, use defaults
+	}
+
+	config := &EventQueueConfig{}
+	if val, ok := result["max_concurrent_bookings"]; ok {
+		fmt.Sscanf(val, "%d", &config.MaxConcurrentBookings)
+	}
+	if val, ok := result["queue_pass_ttl_minutes"]; ok {
+		fmt.Sscanf(val, "%d", &config.QueuePassTTLMinutes)
+	}
+
+	return config, nil
+}
+
+// SetEventQueueConfig sets the queue configuration for an event in Redis cache
+func (r *RedisQueueRepository) SetEventQueueConfig(ctx context.Context, eventID string, config *EventQueueConfig) error {
+	key := fmt.Sprintf("queue:config:%s", eventID)
+	err := r.client.HSet(ctx, key,
+		"max_concurrent_bookings", config.MaxConcurrentBookings,
+		"queue_pass_ttl_minutes", config.QueuePassTTLMinutes,
+	).Err()
+	if err != nil {
+		return fmt.Errorf("failed to set event queue config: %w", err)
+	}
+	return nil
+}
+
 // Ensure RedisQueueRepository implements QueueRepository
 var _ QueueRepository = (*RedisQueueRepository)(nil)
