@@ -20,6 +20,7 @@ var (
 	ErrInvalidUserID     = errors.New("invalid user id")
 	ErrInvalidBookingID  = errors.New("invalid booking id")
 	ErrInvalidEventID    = errors.New("invalid event id")
+	ErrInvalidShowID     = errors.New("invalid show id")
 	ErrInvalidZoneID     = errors.New("invalid zone id")
 	ErrInvalidQuantity   = errors.New("quantity must be greater than zero")
 	ErrInvalidTotalPrice = errors.New("total price cannot be negative")
@@ -56,6 +57,7 @@ func IsValidationError(err error) bool {
 	return errors.Is(err, ErrInvalidUserID) ||
 		errors.Is(err, ErrInvalidBookingID) ||
 		errors.Is(err, ErrInvalidEventID) ||
+		errors.Is(err, ErrInvalidShowID) ||
 		errors.Is(err, ErrInvalidZoneID) ||
 		errors.Is(err, ErrInvalidQuantity) ||
 		errors.Is(err, ErrInvalidTotalPrice) ||

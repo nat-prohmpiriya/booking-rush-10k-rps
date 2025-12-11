@@ -225,6 +225,16 @@ func main() {
 			// Get queue status for an event (public)
 			queue.GET("/status/:event_id", container.QueueHandler.GetQueueStatus)
 		}
+
+		// Admin routes - for managing inventory sync
+		admin := v1.Group("/admin")
+		{
+			// Sync zone availability from PostgreSQL to Redis
+			admin.POST("/sync-inventory", container.AdminHandler.SyncInventory)
+
+			// Get inventory status (PostgreSQL vs Redis)
+			admin.GET("/inventory-status", container.AdminHandler.GetInventoryStatus)
+		}
 	}
 
 	// Create HTTP server with optimized settings
@@ -273,7 +283,7 @@ func main() {
 	appLog.Info("Server exited gracefully")
 }
 
-// userIDMiddleware extracts user_id from X-User-ID header for load testing
+// userIDMiddleware extracts user_id and tenant_id from headers
 func userIDMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := c.GetHeader("X-User-ID")
@@ -282,6 +292,13 @@ func userIDMiddleware() gin.HandlerFunc {
 			userID = "test-user-1"
 		}
 		c.Set("user_id", userID)
+
+		// Extract tenant_id from header (set by API Gateway from JWT)
+		tenantID := c.GetHeader("X-Tenant-ID")
+		if tenantID != "" {
+			c.Set("tenant_id", tenantID)
+		}
+
 		c.Next()
 	}
 }

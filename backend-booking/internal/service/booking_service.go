@@ -109,6 +109,19 @@ func (s *bookingService) ReserveSeats(ctx context.Context, userID string, req *d
 	if userID == "" {
 		return nil, domain.ErrInvalidUserID
 	}
+	if req.ShowID == "" {
+		return nil, domain.ErrInvalidShowID
+	}
+
+	// Get tenant_id from show if not provided in request
+	tenantID := req.TenantID
+	if tenantID == "" {
+		var err error
+		tenantID, err = s.bookingRepo.GetTenantIDByShowID(ctx, req.ShowID)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	// Check idempotency key if provided
 	if req.IdempotencyKey != "" {
@@ -170,7 +183,7 @@ func (s *bookingService) ReserveSeats(ctx context.Context, userID string, req *d
 	now := time.Now()
 	booking := &domain.Booking{
 		ID:             result.BookingID,
-		TenantID:       req.TenantID,
+		TenantID:       tenantID,
 		UserID:         userID,
 		EventID:        req.EventID,
 		ShowID:         req.ShowID,

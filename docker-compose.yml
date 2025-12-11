@@ -141,6 +141,46 @@ services:
     networks:
       - booking-rush
 
+  inventory-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+      args:
+        SERVICE: backend-booking
+        WORKER: inventory-worker
+    image: booking-rush/inventory-worker:latest
+    container_name: booking-rush-inventory-worker
+    environment:
+      - SERVICE_NAME=inventory-worker
+    env_file:
+      - .env
+    depends_on:
+      booking:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - booking-rush
+
+  queue-release-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+      args:
+        SERVICE: backend-booking
+        WORKER: queue-worker
+    image: booking-rush/queue-release-worker:latest
+    container_name: booking-rush-queue-release-worker
+    environment:
+      - SERVICE_NAME=queue-release-worker
+    env_file:
+      - .env
+    depends_on:
+      booking:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - booking-rush
+
 networks:
   booking-rush:
     driver: bridge

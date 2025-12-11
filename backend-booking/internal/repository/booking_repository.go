@@ -43,4 +43,7 @@ type BookingRepository interface {
 
 	// CountByUserAndEvent counts bookings for a user on an event
 	CountByUserAndEvent(ctx context.Context, userID, eventID string) (int, error)
+
+	// GetTenantIDByShowID retrieves tenant_id from shows table
+	GetTenantIDByShowID(ctx context.Context, showID string) (string, error)
 }

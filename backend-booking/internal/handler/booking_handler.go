@@ -44,6 +44,11 @@ func (h *BookingHandler) ReserveSeats(c *gin.Context) {
 		return
 	}
 
+	// Use tenant_id from header if not in request body
+	if req.TenantID == "" {
+		req.TenantID = c.GetString("tenant_id")
+	}
+
 	result, err := h.bookingService.ReserveSeats(c.Request.Context(), userID, &req)
 	if err != nil {
 		h.handleError(c, err)
@@ -242,6 +247,11 @@ func (h *BookingHandler) handleError(c *gin.Context, err error) {
 		c.JSON(http.StatusForbidden, dto.ErrorResponse{
 			Error: err.Error(),
 			Code:  "FORBIDDEN",
+		})
+	case errors.Is(err, domain.ErrInvalidShowID):
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error: err.Error(),
+			Code:  "INVALID_SHOW_ID",
 		})
 	case errors.Is(err, domain.ErrInsufficientSeats):
 		c.JSON(http.StatusConflict, dto.ErrorResponse{

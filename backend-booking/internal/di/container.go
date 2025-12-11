@@ -30,6 +30,7 @@ type Container struct {
 	HealthHandler  *handler.HealthHandler
 	BookingHandler *handler.BookingHandler
 	QueueHandler   *handler.QueueHandler
+	AdminHandler   *handler.AdminHandler
 }
 
 // ContainerConfig contains configuration for building the container
@@ -72,6 +73,7 @@ func NewContainer(cfg *ContainerConfig) *Container {
 	c.HealthHandler = handler.NewHealthHandler(c.DB, c.Redis)
 	c.BookingHandler = handler.NewBookingHandler(c.BookingService)
 	c.QueueHandler = handler.NewQueueHandler(c.QueueService)
+	c.AdminHandler = handler.NewAdminHandler(c.DB, c.Redis)
 
 	return c
 }

@@ -586,5 +586,26 @@ func nullString(s string) *string {
 	return &s
 }
 
+// GetTenantIDByShowID retrieves tenant_id from shows table via events
+func (r *PostgresBookingRepository) GetTenantIDByShowID(ctx context.Context, showID string) (string, error) {
+	query := `
+		SELECT e.tenant_id
+		FROM shows s
+		JOIN events e ON s.event_id = e.id
+		WHERE s.id = $1
+	`
+
+	var tenantID string
+	err := r.pool.QueryRow(ctx, query, showID).Scan(&tenantID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", fmt.Errorf("show not found: %s", showID)
+		}
+		return "", fmt.Errorf("failed to get tenant_id from show: %w", err)
+	}
+
+	return tenantID, nil
+}
+
 // Ensure PostgresBookingRepository implements BookingRepository
 var _ BookingRepository = (*PostgresBookingRepository)(nil)

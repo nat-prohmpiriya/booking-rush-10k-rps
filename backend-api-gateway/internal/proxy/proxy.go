@@ -448,6 +448,17 @@ func ConfigFromEnv(authURL, ticketURL, bookingURL, paymentURL, jwtSecret string)
 				},
 				RequireAuth: true,
 			},
+			// Admin - booking service admin endpoints (protected)
+			{
+				PathPrefix:  "/api/v1/admin",
+				StripPrefix: "",
+				Service: ServiceConfig{
+					Name:    "booking-service",
+					BaseURL: bookingURL,
+					Timeout: 60 * time.Second, // Sync may take longer
+				},
+				RequireAuth: true,
+			},
 			// Payments - all protected
 			{
 				PathPrefix:  "/api/v1/payments",

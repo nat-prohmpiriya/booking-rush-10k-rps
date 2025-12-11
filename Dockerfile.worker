@@ -1,0 +1,65 @@
+# Worker Dockerfile - Multi-stage build
+# Usage: docker build --build-arg SERVICE=backend-booking --build-arg WORKER=inventory-worker -t booking-rush-inventory-worker .
+
+# ================================
+# Stage 1: Build
+# ================================
+FROM golang:1.25-alpine AS builder
+
+ARG SERVICE=backend-booking
+ARG WORKER=inventory-worker
+
+WORKDIR /app
+
+# Install git (required for go modules)
+RUN apk add --no-cache git ca-certificates tzdata
+
+# Copy go workspace files
+COPY go.work go.work.sum ./
+
+# Copy all modules
+COPY pkg/ pkg/
+COPY backend-api-gateway/ backend-api-gateway/
+COPY backend-auth/ backend-auth/
+COPY backend-ticket/ backend-ticket/
+COPY backend-booking/ backend-booking/
+COPY backend-payment/ backend-payment/
+COPY scripts/ scripts/
+COPY tests/ tests/
+
+# Download dependencies
+RUN go work sync
+
+# Build the worker
+WORKDIR /app/${SERVICE}
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+    -ldflags="-w -s" \
+    -o /app/worker ./cmd/${WORKER}
+
+# ================================
+# Stage 2: Runtime
+# ================================
+FROM alpine:3.19
+
+# Add ca-certificates for HTTPS and timezone data
+RUN apk --no-cache add ca-certificates tzdata
+
+# Create non-root user
+RUN addgroup -g 1000 appgroup && \
+    adduser -u 1000 -G appgroup -s /bin/sh -D appuser
+
+WORKDIR /app
+
+# Copy binary from builder
+COPY --from=builder /app/worker .
+
+# Copy Lua scripts (for booking workers)
+COPY --from=builder /app/scripts/lua ./scripts/lua
+
+# Use non-root user
+USER appuser
+
+# Workers don't expose ports, they just process background jobs
+
+# Run the worker
+CMD ["./worker"]
