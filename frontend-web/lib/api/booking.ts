@@ -46,7 +46,13 @@ export const bookingApi = {
   },
 
   async listUserBookings(): Promise<BookingResponse[]> {
-    return apiClient.get<BookingResponse[]>("/bookings")
+    // Backend returns PaginatedResponse: { data, page, page_size, ... }
+    const response = await apiClient.get<{ data: BookingResponse[]; page: number; page_size: number }>("/bookings")
+    // Handle both paginated and array responses
+    if (Array.isArray(response)) {
+      return response
+    }
+    return response.data || []
   },
 }
 

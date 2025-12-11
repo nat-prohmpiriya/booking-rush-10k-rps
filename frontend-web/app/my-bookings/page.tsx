@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select"
 import { useAuth } from "@/contexts/auth-context"
 import { bookingApi } from "@/lib/api/booking"
+import { eventsApi, zonesApi } from "@/lib/api/events"
 import type { BookingResponse } from "@/lib/api/types"
 import {
   Ticket,
@@ -25,9 +26,6 @@ import {
   ChevronRight,
   Filter,
   Search,
-  QrCode,
-  Download,
-  MoreHorizontal,
   AlertCircle,
   CheckCircle2,
   XCircle,
@@ -35,7 +33,7 @@ import {
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 
-// Mock data for bookings (since API might not have full event info)
+// Extended booking type with event and zone details
 interface BookingWithEvent extends BookingResponse {
   event?: {
     id: string
@@ -44,114 +42,13 @@ interface BookingWithEvent extends BookingResponse {
     date: string
     time: string
     image: string
+    slug: string
   }
-  tickets?: {
-    zone: string
-    quantity: number
+  zone?: {
+    name: string
     price: number
   }
 }
-
-const MOCK_BOOKINGS: BookingWithEvent[] = [
-  {
-    id: "booking-001",
-    user_id: "user-1",
-    event_id: "event-1",
-    zone_id: "zone-1",
-    quantity: 2,
-    status: "confirmed",
-    total_price: 4500,
-    reserved_at: "2025-12-15T10:30:00Z",
-    confirmed_at: "2025-12-15T10:35:00Z",
-    expires_at: "2025-12-15T10:40:00Z",
-    event: {
-      id: "event-1",
-      title: "BLACKPINK World Tour 2025",
-      venue: "Rajamangala National Stadium, Bangkok",
-      date: "Jan 15, 2025",
-      time: "7:00 PM",
-      image: "/images/events/event-1.jpg",
-    },
-    tickets: {
-      zone: "VIP Standing",
-      quantity: 2,
-      price: 2250,
-    },
-  },
-  {
-    id: "booking-002",
-    user_id: "user-1",
-    event_id: "event-2",
-    zone_id: "zone-2",
-    quantity: 2,
-    status: "pending",
-    total_price: 3200,
-    reserved_at: "2025-12-10T14:20:00Z",
-    expires_at: "2025-12-10T14:30:00Z",
-    event: {
-      id: "event-2",
-      title: "Ed Sheeran + - = ÷ x Tour",
-      venue: "Impact Arena, Bangkok",
-      date: "Feb 20, 2025",
-      time: "8:00 PM",
-      image: "/images/events/event-2.jpg",
-    },
-    tickets: {
-      zone: "Gold Section",
-      quantity: 2,
-      price: 1600,
-    },
-  },
-  {
-    id: "booking-003",
-    user_id: "user-1",
-    event_id: "event-3",
-    zone_id: "zone-3",
-    quantity: 3,
-    status: "completed",
-    total_price: 1800,
-    reserved_at: "2025-11-20T09:15:00Z",
-    confirmed_at: "2025-11-20T09:20:00Z",
-    expires_at: "2025-11-20T09:25:00Z",
-    event: {
-      id: "event-3",
-      title: "Jazz Festival 2025",
-      venue: "Lumpini Park, Bangkok",
-      date: "Nov 25, 2025",
-      time: "6:00 PM",
-      image: "/images/events/event-3.jpg",
-    },
-    tickets: {
-      zone: "General Admission",
-      quantity: 3,
-      price: 600,
-    },
-  },
-  {
-    id: "booking-004",
-    user_id: "user-1",
-    event_id: "event-4",
-    zone_id: "zone-4",
-    quantity: 1,
-    status: "cancelled",
-    total_price: 5500,
-    reserved_at: "2025-10-05T16:45:00Z",
-    expires_at: "2025-10-05T16:55:00Z",
-    event: {
-      id: "event-4",
-      title: "Taylor Swift Eras Tour",
-      venue: "Rajamangala National Stadium, Bangkok",
-      date: "Oct 20, 2025",
-      time: "7:30 PM",
-      image: "/images/events/event-4.jpg",
-    },
-    tickets: {
-      zone: "Premium Seat",
-      quantity: 1,
-      price: 5500,
-    },
-  },
-]
 
 function BookingCardSkeleton() {
   return (
@@ -221,114 +118,81 @@ function BookingCard({ booking }: { booking: BookingWithEvent }) {
   const StatusIcon = statusConfig.icon
 
   return (
-    <div className="group glass rounded-xl p-4 sm:p-6 border border-border/50 hover:border-primary/50 transition-all duration-300">
-      <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
-        {/* Event Image */}
-        <div className="relative h-40 sm:h-40 sm:w-56 shrink-0 overflow-hidden rounded-lg">
-          <img
-            src={booking.event?.image || "/placeholder.svg"}
-            alt={booking.event?.title || "Event"}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-          />
-          <div className="absolute top-2 right-2">
-            <Badge className={`${statusConfig.color} border`}>
-              <StatusIcon className="h-3 w-3 mr-1" />
-              {statusConfig.label}
-            </Badge>
-          </div>
-        </div>
-
-        {/* Booking Info */}
-        <div className="flex-1 space-y-3">
-          <div>
-            <h3 className="text-xl font-bold text-foreground group-hover:text-primary transition-colors line-clamp-1">
-              {booking.event?.title || "Unknown Event"}
-            </h3>
-            <div className="flex items-center gap-2 text-muted-foreground text-sm mt-1">
-              <MapPin className="h-4 w-4" />
-              <span className="line-clamp-1">{booking.event?.venue || "TBA"}</span>
+    <Link href={`/my-bookings/${booking.id}`} className="block">
+      <div className="group glass rounded-xl p-4 sm:p-6 border border-border/50 hover:border-primary/50 transition-all duration-300 cursor-pointer">
+        <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
+          {/* Event Image */}
+          <div className="relative h-40 sm:h-40 sm:w-56 shrink-0 overflow-hidden rounded-lg">
+            <img
+              src={booking.event?.image || "/placeholder.svg"}
+              alt={booking.event?.title || "Event"}
+              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+            />
+            <div className="absolute top-2 right-2">
+              <Badge className={`${statusConfig.color} border`}>
+                <StatusIcon className="h-3 w-3 mr-1" />
+                {statusConfig.label}
+              </Badge>
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-4 text-sm">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Calendar className="h-4 w-4 text-primary" />
-              <span>{booking.event?.date || "TBA"}</span>
+          {/* Booking Info */}
+          <div className="flex-1 space-y-3">
+            <div>
+              <h3 className="text-xl font-bold text-foreground group-hover:text-primary transition-colors line-clamp-1">
+                {booking.event?.title || "Unknown Event"}
+              </h3>
+              <div className="flex items-center gap-2 text-muted-foreground text-sm mt-1">
+                <MapPin className="h-4 w-4" />
+                <span className="line-clamp-1">{booking.event?.venue || "TBA"}</span>
+              </div>
             </div>
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Clock className="h-4 w-4 text-primary" />
-              <span>{booking.event?.time || "TBA"}</span>
+
+            <div className="flex flex-wrap gap-4 text-sm">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Calendar className="h-4 w-4 text-primary" />
+                <span>{booking.event?.date || "TBA"}</span>
+              </div>
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Clock className="h-4 w-4 text-primary" />
+                <span>{booking.event?.time || "TBA"}</span>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2 text-sm">
+                <Ticket className="h-4 w-4 text-primary" />
+                <span className="text-foreground font-medium">{booking.zone?.name || "Standard"}</span>
+                <span className="text-muted-foreground">× {booking.quantity}</span>
+              </div>
+            </div>
+
+            <div className="text-xs text-muted-foreground">
+              Booked on {new Date(booking.reserved_at).toLocaleDateString("en-US", {
+                year: "numeric",
+                month: "short",
+                day: "numeric"
+              })}
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2 text-sm">
-              <Ticket className="h-4 w-4 text-primary" />
-              <span className="text-foreground font-medium">{booking.tickets?.zone || "Standard"}</span>
-              <span className="text-muted-foreground">× {booking.tickets?.quantity || 1}</span>
+          {/* Price and Arrow */}
+          <div className="flex flex-row sm:flex-col justify-between sm:justify-center items-end sm:items-end gap-4 pt-4 sm:pt-0 border-t sm:border-t-0 border-border/50">
+            <div className="text-right">
+              <p className="text-xs text-muted-foreground">Total</p>
+              <p className="text-2xl font-bold bg-linear-to-r from-primary to-amber-400 bg-clip-text text-transparent">
+                ฿{booking.total_price.toLocaleString()}
+              </p>
             </div>
-          </div>
 
-          <div className="text-xs text-muted-foreground">
-            Booked on {new Date(booking.reserved_at).toLocaleDateString("en-US", {
-              year: "numeric",
-              month: "short",
-              day: "numeric"
-            })}
-          </div>
-        </div>
-
-        {/* Price and Actions */}
-        <div className="flex flex-row sm:flex-col justify-between sm:justify-between items-end sm:items-end gap-4 pt-4 sm:pt-0 border-t sm:border-t-0 border-border/50">
-          <div className="text-right">
-            <p className="text-xs text-muted-foreground">Total</p>
-            <p className="text-2xl font-bold bg-linear-to-r from-primary to-amber-400 bg-clip-text text-transparent">
-              ฿{booking.total_price.toLocaleString()}
-            </p>
-          </div>
-          
-          <div className="flex flex-col gap-2">
-            {booking.status === "confirmed" && (
-              <Button
-                size="sm"
-                className="bg-linear-to-r from-primary to-amber-400 hover:from-amber-400 hover:to-primary text-primary-foreground font-semibold"
-              >
-                <QrCode className="h-4 w-4 mr-2" />
-                View Tickets
-              </Button>
-            )}
-            {booking.status === "pending" && (
-              <Button
-                size="sm"
-                className="bg-linear-to-r from-primary to-amber-400 hover:from-amber-400 hover:to-primary text-primary-foreground font-semibold"
-              >
-                Complete Payment
-              </Button>
-            )}
-            {booking.status === "completed" && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="border-primary/50 text-primary hover:bg-primary/10"
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Download
-              </Button>
-            )}
-            <Link href={`/events/${booking.event?.id || ""}`}>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="text-muted-foreground hover:text-primary w-full"
-              >
-                View Event
-                <ChevronRight className="h-4 w-4 ml-1" />
-              </Button>
-            </Link>
+            <div className="flex items-center gap-2 text-muted-foreground group-hover:text-primary transition-colors">
+              <span className="text-sm">View Details</span>
+              <ChevronRight className="h-5 w-5" />
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </Link>
   )
 }
 
@@ -351,17 +215,58 @@ export default function MyBookingsPage() {
     async function fetchBookings() {
       setIsLoading(true)
       try {
-        // Try to fetch from API first
+        // Fetch bookings from API
         const apiBookings = await bookingApi.listUserBookings()
-        // If API returns empty, use mock data for demo
-        if (apiBookings && apiBookings.length > 0) {
-          setBookings(apiBookings as BookingWithEvent[])
-        } else {
-          setBookings(MOCK_BOOKINGS)
+
+        if (!apiBookings || apiBookings.length === 0) {
+          setBookings([])
+          return
         }
+
+        // Fetch event and zone details for each booking
+        const bookingsWithDetails: BookingWithEvent[] = await Promise.all(
+          apiBookings.map(async (booking) => {
+            const bookingWithEvent: BookingWithEvent = { ...booking }
+
+            // Fetch event details
+            try {
+              const event = await eventsApi.getById(booking.event_id)
+              bookingWithEvent.event = {
+                id: event.id,
+                title: event.name,
+                venue: `${event.venue_name}, ${event.city}`,
+                date: new Date(event.created_at).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                }),
+                time: "TBA", // Shows have specific times
+                image: event.poster_url || "/placeholder.svg",
+                slug: event.slug,
+              }
+            } catch (err) {
+              console.warn(`Failed to fetch event ${booking.event_id}:`, err)
+            }
+
+            // Fetch zone details
+            try {
+              const zone = await zonesApi.getById(booking.zone_id)
+              bookingWithEvent.zone = {
+                name: zone.name,
+                price: zone.price,
+              }
+            } catch (err) {
+              console.warn(`Failed to fetch zone ${booking.zone_id}:`, err)
+            }
+
+            return bookingWithEvent
+          })
+        )
+
+        setBookings(bookingsWithDetails)
       } catch (error) {
-        console.warn("Failed to fetch bookings from API, using mock data:", error)
-        setBookings(MOCK_BOOKINGS)
+        console.error("Failed to fetch bookings:", error)
+        setBookings([])
       } finally {
         setIsLoading(false)
       }
