@@ -4,6 +4,7 @@ import type React from "react"
 import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { Eye, EyeOff } from "lucide-react"
 import { Logo } from "@/components/logo"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -22,6 +23,8 @@ export default function RegisterPage() {
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [success, setSuccess] = useState<Record<string, boolean>>({})
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   const validateField = (name: string, value: string) => {
     switch (name) {
@@ -162,17 +165,26 @@ export default function RegisterPage() {
               <Label htmlFor="password" className="text-foreground">
                 Password
               </Label>
-              <Input
-                id="password"
-                name="password"
-                type="password"
-                placeholder="••••••••"
-                value={formData.password}
-                onChange={handleChange}
-                className={`bg-secondary border-border focus:border-primary transition-all ${
-                  errors.password ? "border-destructive focus:border-destructive" : ""
-                } ${success.password ? "border-success focus:border-success" : ""}`}
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={formData.password}
+                  onChange={handleChange}
+                  className={`bg-secondary border-border focus:border-primary transition-all pr-10 ${
+                    errors.password ? "border-destructive focus:border-destructive" : ""
+                  } ${success.password ? "border-success focus:border-success" : ""}`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
               {errors.password && <p className="text-sm text-destructive">{errors.password}</p>}
               <p className="text-xs text-muted-foreground">
                 Min 8 chars, uppercase, lowercase, number, special character
@@ -183,17 +195,26 @@ export default function RegisterPage() {
               <Label htmlFor="confirmPassword" className="text-foreground">
                 Confirm Password
               </Label>
-              <Input
-                id="confirmPassword"
-                name="confirmPassword"
-                type="password"
-                placeholder="••••••••"
-                value={formData.confirmPassword}
-                onChange={handleChange}
-                className={`bg-secondary border-border focus:border-primary transition-all ${
-                  errors.confirmPassword ? "border-destructive focus:border-destructive" : ""
-                } ${success.confirmPassword ? "border-success focus:border-success" : ""}`}
-              />
+              <div className="relative">
+                <Input
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={formData.confirmPassword}
+                  onChange={handleChange}
+                  className={`bg-secondary border-border focus:border-primary transition-all pr-10 ${
+                    errors.confirmPassword ? "border-destructive focus:border-destructive" : ""
+                  } ${success.confirmPassword ? "border-success focus:border-success" : ""}`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
               {errors.confirmPassword && <p className="text-sm text-destructive">{errors.confirmPassword}</p>}
             </div>
 

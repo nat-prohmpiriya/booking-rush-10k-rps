@@ -1,9 +1,10 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { Eye, EyeOff } from "lucide-react"
 import { Logo } from "@/components/logo"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -22,6 +23,17 @@ export default function LoginPage() {
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [success, setSuccess] = useState<Record<string, boolean>>({})
+  const [showPassword, setShowPassword] = useState(false)
+
+  const REMEMBER_EMAIL_KEY = "remembered_email"
+
+  useEffect(() => {
+    const rememberedEmail = localStorage.getItem(REMEMBER_EMAIL_KEY)
+    if (rememberedEmail) {
+      setFormData((prev) => ({ ...prev, email: rememberedEmail, rememberMe: true }))
+      setSuccess((prev) => ({ ...prev, email: true }))
+    }
+  }, [])
 
   const validateField = (name: string, value: string) => {
     switch (name) {
@@ -61,6 +73,14 @@ export default function LoginPage() {
     if (Object.keys(newErrors).length === 0) {
       try {
         await login({ email: formData.email, password: formData.password })
+
+        // Handle Remember Me
+        if (formData.rememberMe) {
+          localStorage.setItem(REMEMBER_EMAIL_KEY, formData.email)
+        } else {
+          localStorage.removeItem(REMEMBER_EMAIL_KEY)
+        }
+
         router.push("/")
       } catch {
         // Error is handled in auth context
@@ -124,17 +144,26 @@ export default function LoginPage() {
               <Label htmlFor="password" className="text-foreground">
                 Password
               </Label>
-              <Input
-                id="password"
-                name="password"
-                type="password"
-                placeholder="••••••••"
-                value={formData.password}
-                onChange={handleChange}
-                className={`bg-secondary border-border focus:border-primary transition-all ${
-                  errors.password ? "border-destructive focus:border-destructive" : ""
-                } ${success.password ? "border-success focus:border-success" : ""}`}
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={formData.password}
+                  onChange={handleChange}
+                  className={`bg-secondary border-border focus:border-primary transition-all pr-10 ${
+                    errors.password ? "border-destructive focus:border-destructive" : ""
+                  } ${success.password ? "border-success focus:border-success" : ""}`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
               {errors.password && <p className="text-sm text-destructive">{errors.password}</p>}
             </div>
 
