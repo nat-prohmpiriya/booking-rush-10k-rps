@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from "react"
 import { eventsApi, showsApi, zonesApi } from "@/lib/api/events"
 import type { EventResponse, EventListFilter, ShowResponse, ShowZoneResponse } from "@/lib/api/types"
-import { EVENTS_DATA, type Event as MockEvent, type TicketZone as MockTicketZone } from "@/lib/events-data"
 
 interface UseEventsReturn {
   events: EventDisplay[]
@@ -27,6 +26,9 @@ export interface EventDisplay {
   status?: string
   city?: string
   country?: string
+  bookingStartAt?: string
+  bookingEndAt?: string
+  description?: string
 }
 
 function mapApiEventToDisplay(event: EventResponse): EventDisplay {
@@ -47,23 +49,12 @@ function mapApiEventToDisplay(event: EventResponse): EventDisplay {
     status: event.status,
     city: event.city,
     country: event.country,
+    bookingStartAt: event.booking_start_at,
+    bookingEndAt: event.booking_end_at,
+    description: event.description,
   }
 }
 
-function mapMockEventToDisplay(event: MockEvent): EventDisplay {
-  return {
-    id: event.id,
-    title: event.title,
-    subtitle: event.subtitle,
-    venue: event.venue,
-    date: event.date,
-    fullDate: event.fullDate,
-    time: event.time,
-    image: event.image,
-    heroImage: event.heroImage,
-    price: Math.min(...event.ticketZones.map((z) => z.price)),
-  }
-}
 
 export function useEvents(filter?: EventListFilter): UseEventsReturn {
   const [events, setEvents] = useState<EventDisplay[]>([])
@@ -126,13 +117,8 @@ export function useEvent(id: string | number): UseEventReturn {
         const response = await eventsApi.getById(String(id))
         setEvent(mapApiEventToDisplay(response))
       } catch (err) {
-        console.warn("Failed to fetch event from API, using mock data:", err)
-        const mockEvent = EVENTS_DATA.find((e) => e.id === Number(id))
-        if (mockEvent) {
-          setEvent(mapMockEventToDisplay(mockEvent))
-        } else {
-          setError("Event not found")
-        }
+        console.error("Failed to fetch event from API:", err)
+        setError("Event not found")
       } finally {
         setIsLoading(false)
       }
@@ -288,22 +274,8 @@ export function useEventDetail(eventId: string): EventDetailData & {
           setShows([])
         }
       } catch (err) {
-        console.warn("Failed to fetch event from API, using mock data:", err)
-        // Try mock data
-        const mockEvent = EVENTS_DATA.find((e) => e.id === Number(eventId))
-        if (mockEvent) {
-          setEvent(mapMockEventToDisplay(mockEvent))
-          // Map mock ticket zones
-          setZones(mockEvent.ticketZones.map((z: MockTicketZone): TicketZoneDisplay => ({
-            id: z.id,
-            name: z.name,
-            price: z.price,
-            available: z.available,
-            soldOut: z.soldOut,
-          })))
-        } else {
-          setError("Event not found")
-        }
+        console.error("Failed to fetch event from API:", err)
+        setError("Event not found")
       } finally {
         setIsLoading(false)
       }

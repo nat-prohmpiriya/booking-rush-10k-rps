@@ -96,6 +96,23 @@ export default function EventDetailPage() {
     soldOut: zone.soldOut,
   }))
 
+  // Check if event has ended (show date has passed)
+  const getShowDate = (): Date | undefined => {
+    if (selectedShow?.show_date) {
+      return new Date(selectedShow.show_date)
+    }
+    return undefined
+  }
+
+  const isEventEnded = (): boolean => {
+    const showDate = getShowDate()
+    if (!showDate) return false
+    const now = new Date()
+    // Add 24 hours to show date to account for full day
+    const showEndOfDay = new Date(showDate.getTime() + (24 * 60 * 60 * 1000))
+    return now > showEndOfDay
+  }
+
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white">
       <Header />
@@ -109,7 +126,11 @@ export default function EventDetailPage() {
               <p className="text-xl text-[#d4af37] text-pretty">{event.subtitle}</p>
             </div>
 
-            <CountdownTimer />
+            <CountdownTimer
+              targetDate={event.bookingStartAt ? new Date(event.bookingStartAt) : undefined}
+              saleEndDate={event.bookingEndAt ? new Date(event.bookingEndAt) : undefined}
+              showDate={getShowDate()}
+            />
 
             {/* Show selector if multiple shows */}
             {shows.length > 1 && (
@@ -141,8 +162,8 @@ export default function EventDetailPage() {
             )}
 
             <EventInfo
-              date={event.fullDate?.split(",").slice(0, 2).join(",") || event.date}
-              year="2025"
+              date={selectedShow ? new Date(selectedShow.show_date).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }) : (event.fullDate?.split(",").slice(0, 2).join(",") || event.date)}
+              year={selectedShow ? new Date(selectedShow.show_date).getFullYear().toString() : new Date().getFullYear().toString()}
               time={formatShowTime()}
               doorsOpen={formatDoorsOpen()}
               venue={event.venue.split(",")[0]}
@@ -160,7 +181,7 @@ export default function EventDetailPage() {
         </div>
       </div>
 
-      <StickyCheckout totalPrice={getTotalPrice()} totalTickets={getTotalTickets()} />
+      <StickyCheckout totalPrice={getTotalPrice()} totalTickets={getTotalTickets()} isEventEnded={isEventEnded()} />
     </div>
   )
 }

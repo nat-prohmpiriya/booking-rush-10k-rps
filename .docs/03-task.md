@@ -1149,108 +1149,108 @@
 
 **Goal:** User-facing web application
 
-### [ ]  P7-01: Next.js Project Setup
+### [x]  P7-01: Next.js Project Setup
 | Field | Value |
 |-------|-------|
 | **Description** | Initialize Next.js 15 project |
-| **Technical Context** | `backend-web/` |
+| **Technical Context** | `frontend-web/` |
 | **Acceptance Criteria** | - Next.js 15 with App Router<br>- TailwindCSS configured<br>- Shadcn UI installed<br>- Development server runs |
 
-- [ ] Create Next.js project
-- [ ] Configure TailwindCSS
-- [ ] Install Shadcn UI
-- [ ] Setup environment variables
-- [ ] Create base layout
+- [x] Create Next.js project
+- [x] Configure TailwindCSS
+- [x] Install Shadcn UI
+- [x] Setup environment variables
+- [x] Create base layout
 
 ---
 
-### [ ]  P7-02: API Client Setup
+### [x]  P7-02: API Client Setup
 | Field | Value |
 |-------|-------|
 | **Description** | Setup API client with Axios |
-| **Technical Context** | `backend-web/lib/api.ts` |
+| **Technical Context** | `frontend-web/lib/api.ts` |
 | **Acceptance Criteria** | - Axios instance with base URL<br>- JWT token injection<br>- Error handling<br>- Token refresh logic |
 
-- [ ] Create Axios instance
-- [ ] Add JWT interceptor
-- [ ] Handle 401 (token refresh)
-- [ ] Handle errors globally
-- [ ] Write tests
+- [x] Create Axios instance
+- [x] Add JWT interceptor
+- [x] Handle 401 (token refresh)
+- [x] Handle errors globally
+- [x] Write tests
 
 ---
 
-### [ ]  P7-03: Auth State Management
+### [x]  P7-03: Auth State Management
 | Field | Value |
 |-------|-------|
 | **Description** | Implement auth state with Zustand |
-| **Technical Context** | `backend-web/store/auth.ts` |
+| **Technical Context** | `frontend-web/store/auth.ts` |
 | **Acceptance Criteria** | - Login/logout actions<br>- Persist tokens in localStorage<br>- User state available globally |
 
-- [ ] Create auth store
-- [ ] Implement login action
-- [ ] Implement logout action
-- [ ] Persist tokens
-- [ ] Create auth provider
+- [x] Create auth store
+- [x] Implement login action
+- [x] Implement logout action
+- [x] Persist tokens
+- [x] Create auth provider
 
 ---
 
-### [ ]  P7-04: Auth Pages
+### [x]  P7-04: Auth Pages
 | Field | Value |
 |-------|-------|
 | **Description** | Create auth pages |
-| **Technical Context** | `backend-web/app/auth/` |
+| **Technical Context** | `frontend-web/app/auth/` |
 | **Acceptance Criteria** | - `/auth/login` page<br>- `/auth/register` page<br>- Form validation<br>- Error handling |
 
-- [ ] Create login page
-- [ ] Create register page
-- [ ] Add form validation (Zod + React Hook Form)
-- [ ] Handle errors
-- [ ] Redirect on success
+- [x] Create login page
+- [x] Create register page
+- [x] Add form validation (Zod + React Hook Form)
+- [x] Handle errors
+- [x] Redirect on success
 
 ---
 
-### [ ]  P7-05: Event List Page
+### [x]  P7-05: Event List Page
 | Field | Value |
 |-------|-------|
 | **Description** | Create event listing page |
-| **Technical Context** | `backend-web/app/page.tsx` |
+| **Technical Context** | `frontend-web/app/events/page.tsx` |
 | **Acceptance Criteria** | - Homepage shows event list<br>- Search and filter support<br>- Pagination<br>- Responsive design |
 
-- [ ] Create event list component
-- [ ] Implement search
-- [ ] Implement filters (category)
-- [ ] Add pagination
-- [ ] Make responsive
+- [x] Create event list component
+- [x] Implement search
+- [x] Implement filters (category, date range, price range, location)
+- [x] Add pagination
+- [x] Make responsive
 
 ---
 
-### [ ]  P7-06: Event Detail Page
+### [x]  P7-06: Event Detail Page
 | Field | Value |
 |-------|-------|
 | **Description** | Create event detail page |
-| **Technical Context** | `backend-web/app/events/[slug]/page.tsx` |
+| **Technical Context** | `frontend-web/app/events/[slug]/page.tsx` |
 | **Acceptance Criteria** | - `/events/:slug` shows event details<br>- Shows available shows<br>- Shows countdown to sale start<br>- "Book Now" button |
 
-- [ ] Create event detail page
-- [ ] Fetch event by slug
-- [ ] Display shows
-- [ ] Show countdown timer
-- [ ] Handle "Book Now" click
+- [x] Create event detail page
+- [x] Fetch event by slug
+- [x] Display shows
+- [x] Show countdown timer
+- [x] Handle "Book Now" click
 
 ---
 
-### [ ]  P7-07: Booking Flow - Zone Selection
+### [x]  P7-07: Booking Flow - Zone Selection
 | Field | Value |
 |-------|-------|
 | **Description** | Create zone selection page |
-| **Technical Context** | `backend-web/app/events/[slug]/booking/page.tsx` |
+| **Technical Context** | `frontend-web/app/events/[slug]/booking/page.tsx` |
 | **Acceptance Criteria** | - Show available zones<br>- Real-time availability<br>- Quantity selector (max 4)<br>- Price calculation |
 
-- [ ] Create zone selection page
-- [ ] Fetch zones with availability
-- [ ] Implement quantity selector
-- [ ] Show total price
-- [ ] Handle "Reserve" click
+- [x] Create zone selection page
+- [x] Fetch zones with availability
+- [x] Implement quantity selector
+- [x] Show total price
+- [x] Handle "Reserve" click
 
 ---
 
@@ -1258,7 +1258,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Create payment page |
-| **Technical Context** | `backend-web/app/events/[slug]/payment/page.tsx` |
+| **Technical Context** | `frontend-web/app/events/[slug]/payment/page.tsx` |
 | **Acceptance Criteria** | - Show order summary<br>- Countdown timer (10 min)<br>- Payment form (mock)<br>- Handle timeout |
 
 - [ ] Create payment page
@@ -1274,7 +1274,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Create confirmation page |
-| **Technical Context** | `backend-web/app/bookings/[id]/page.tsx` |
+| **Technical Context** | `frontend-web/app/bookings/[id]/page.tsx` |
 | **Acceptance Criteria** | - Show booking details<br>- Show E-Ticket (QR code)<br>- Download option |
 
 - [ ] Create confirmation page
@@ -1288,7 +1288,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Create queue waiting room page |
-| **Technical Context** | `backend-web/app/queue/page.tsx` |
+| **Technical Context** | `frontend-web/app/queue/page.tsx` |
 | **Acceptance Criteria** | - Show queue position<br>- Show estimated wait time<br>- Auto-refresh status<br>- Auto-redirect when ready |
 
 - [ ] Create queue page
@@ -1303,7 +1303,7 @@
 | Field | Value |
 |-------|-------|
 | **Description** | Create user dashboard pages |
-| **Technical Context** | `backend-web/app/bookings/` |
+| **Technical Context** | `frontend-web/app/bookings/` |
 | **Acceptance Criteria** | - Booking history list<br>- Pending bookings with "Resume Payment"<br>- Profile settings |
 
 - [ ] Create booking history page
