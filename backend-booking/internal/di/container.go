@@ -17,26 +17,31 @@ type Container struct {
 	// Repositories
 	BookingRepo     repository.BookingRepository
 	ReservationRepo repository.ReservationRepository
+	QueueRepo       repository.QueueRepository
 
 	// Publishers
 	EventPublisher service.EventPublisher
 
 	// Services
 	BookingService service.BookingService
+	QueueService   service.QueueService
 
 	// Handlers
 	HealthHandler  *handler.HealthHandler
 	BookingHandler *handler.BookingHandler
+	QueueHandler   *handler.QueueHandler
 }
 
 // ContainerConfig contains configuration for building the container
 type ContainerConfig struct {
-	DB              *database.PostgresDB
-	Redis           *redis.Client
-	BookingRepo     repository.BookingRepository
-	ReservationRepo repository.ReservationRepository
-	EventPublisher  service.EventPublisher
-	ServiceConfig   *service.BookingServiceConfig
+	DB                 *database.PostgresDB
+	Redis              *redis.Client
+	BookingRepo        repository.BookingRepository
+	ReservationRepo    repository.ReservationRepository
+	QueueRepo          repository.QueueRepository
+	EventPublisher     service.EventPublisher
+	ServiceConfig      *service.BookingServiceConfig
+	QueueServiceConfig *service.QueueServiceConfig
 }
 
 // NewContainer creates a new dependency injection container
@@ -46,6 +51,7 @@ func NewContainer(cfg *ContainerConfig) *Container {
 		Redis:           cfg.Redis,
 		BookingRepo:     cfg.BookingRepo,
 		ReservationRepo: cfg.ReservationRepo,
+		QueueRepo:       cfg.QueueRepo,
 		EventPublisher:  cfg.EventPublisher,
 	}
 
@@ -57,9 +63,15 @@ func NewContainer(cfg *ContainerConfig) *Container {
 		cfg.ServiceConfig,
 	)
 
+	c.QueueService = service.NewQueueService(
+		c.QueueRepo,
+		cfg.QueueServiceConfig,
+	)
+
 	// Initialize handlers
 	c.HealthHandler = handler.NewHealthHandler(c.DB, c.Redis)
 	c.BookingHandler = handler.NewBookingHandler(c.BookingService)
+	c.QueueHandler = handler.NewQueueHandler(c.QueueService)
 
 	return c
 }

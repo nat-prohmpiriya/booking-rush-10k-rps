@@ -34,6 +34,13 @@ var (
 
 	// Event errors
 	ErrEventNotFound = errors.New("event not found")
+
+	// Queue errors
+	ErrQueueNotOpen     = errors.New("queue is not open for this event")
+	ErrAlreadyInQueue   = errors.New("user is already in queue")
+	ErrNotInQueue       = errors.New("user is not in queue")
+	ErrQueueFull        = errors.New("queue is full")
+	ErrInvalidQueueToken = errors.New("invalid queue token")
 )
 
 // IsNotFoundError checks if the error is a not found error

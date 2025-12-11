@@ -339,3 +339,45 @@ func (c *Client) Pipeline() redis.Pipeliner {
 func (c *Client) TxPipeline() redis.Pipeliner {
 	return c.client.TxPipeline()
 }
+
+// --- Sorted Set Operations ---
+
+// ZAdd adds members to a sorted set
+func (c *Client) ZAdd(ctx context.Context, key string, members ...redis.Z) *redis.IntCmd {
+	return c.client.ZAdd(ctx, key, members...)
+}
+
+// ZRank gets the rank of a member in a sorted set (0-indexed)
+func (c *Client) ZRank(ctx context.Context, key, member string) *redis.IntCmd {
+	return c.client.ZRank(ctx, key, member)
+}
+
+// ZScore gets the score of a member in a sorted set
+func (c *Client) ZScore(ctx context.Context, key, member string) *redis.FloatCmd {
+	return c.client.ZScore(ctx, key, member)
+}
+
+// ZCard gets the number of members in a sorted set
+func (c *Client) ZCard(ctx context.Context, key string) *redis.IntCmd {
+	return c.client.ZCard(ctx, key)
+}
+
+// ZRem removes members from a sorted set
+func (c *Client) ZRem(ctx context.Context, key string, members ...interface{}) *redis.IntCmd {
+	return c.client.ZRem(ctx, key, members...)
+}
+
+// ZRange gets a range of members from a sorted set by rank
+func (c *Client) ZRange(ctx context.Context, key string, start, stop int64) *redis.StringSliceCmd {
+	return c.client.ZRange(ctx, key, start, stop)
+}
+
+// ZRangeByScore gets a range of members from a sorted set by score
+func (c *Client) ZRangeByScore(ctx context.Context, key string, opt *redis.ZRangeBy) *redis.StringSliceCmd {
+	return c.client.ZRangeByScore(ctx, key, opt)
+}
+
+// ZCount counts members in a sorted set within score range
+func (c *Client) ZCount(ctx context.Context, key, min, max string) *redis.IntCmd {
+	return c.client.ZCount(ctx, key, min, max)
+}

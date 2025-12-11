@@ -115,12 +115,19 @@ func main() {
 	// Initialize repositories
 	bookingRepo := repository.NewPostgresBookingRepository(db.Pool())
 	reservationRepo := repository.NewRedisReservationRepository(redisClient)
+	queueRepo := repository.NewRedisQueueRepository(redisClient)
 
 	// Pre-load Lua scripts into Redis
 	if err := reservationRepo.LoadScripts(ctx); err != nil {
-		appLog.Warn(fmt.Sprintf("Failed to pre-load Lua scripts: %v", err))
+		appLog.Warn(fmt.Sprintf("Failed to pre-load reservation Lua scripts: %v", err))
 	} else {
-		appLog.Info("Lua scripts pre-loaded into Redis")
+		appLog.Info("Reservation Lua scripts pre-loaded into Redis")
+	}
+
+	if err := queueRepo.LoadScripts(ctx); err != nil {
+		appLog.Warn(fmt.Sprintf("Failed to pre-load queue Lua scripts: %v", err))
+	} else {
+		appLog.Info("Queue Lua scripts pre-loaded into Redis")
 	}
 
 	// Build dependency injection container
@@ -129,10 +136,16 @@ func main() {
 		Redis:           redisClient,
 		BookingRepo:     bookingRepo,
 		ReservationRepo: reservationRepo,
+		QueueRepo:       queueRepo,
 		EventPublisher:  eventPublisher,
 		ServiceConfig: &service.BookingServiceConfig{
 			ReservationTTL: 10 * time.Minute,
 			MaxPerUser:     10,
+		},
+		QueueServiceConfig: &service.QueueServiceConfig{
+			QueueTTL:             30 * time.Minute,
+			MaxQueueSize:         0, // Unlimited
+			EstimatedWaitPerUser: 3, // 3 seconds per user
 		},
 	})
 
@@ -194,6 +207,23 @@ func main() {
 			bookings.GET("", container.BookingHandler.GetUserBookings)
 			bookings.GET("/pending", container.BookingHandler.GetPendingBookings)
 			bookings.GET("/:id", container.BookingHandler.GetBooking)
+		}
+
+		// Queue routes - Virtual Queue for high-demand events
+		queue := v1.Group("/queue")
+		queue.Use(userIDMiddleware()) // Extract user_id from header
+		{
+			// Join queue (requires authentication)
+			queue.POST("/join", middleware.IdempotencyMiddleware(idempotencyConfig), container.QueueHandler.JoinQueue)
+
+			// Get current position in queue
+			queue.GET("/position/:event_id", container.QueueHandler.GetPosition)
+
+			// Leave queue
+			queue.DELETE("/leave", container.QueueHandler.LeaveQueue)
+
+			// Get queue status for an event (public)
+			queue.GET("/status/:event_id", container.QueueHandler.GetQueueStatus)
 		}
 	}
 
