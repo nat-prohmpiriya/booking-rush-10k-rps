@@ -1,0 +1,31 @@
+name: Build Auth Service
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend-auth/**'
+      - 'pkg/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & Push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          build-args: SERVICE=backend-auth
+          tags: ghcr.io/${{ github.repository }}/auth:latest
