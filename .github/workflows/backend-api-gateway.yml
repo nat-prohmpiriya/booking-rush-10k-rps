@@ -1,4 +1,4 @@
-name: Build Backend API Gateway
+name: Build API Gateway
 on:
   push:
     branches: [main]        # trigger เมื่อ push ไป main
