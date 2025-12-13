@@ -595,17 +595,21 @@ export default function EditEventPage() {
                       </div>
                       <div className="space-y-2">
                         <Label>Status</Label>
-                        <select
+                        <Select
                           value={showForm.status || show.status}
-                          onChange={(e) => setShowForm({ ...showForm, status: e.target.value })}
-                          className="w-full h-10 px-3 border border-input rounded-md bg-input"
+                          onValueChange={(value) => setShowForm({ ...showForm, status: value })}
                         >
-                          <option value="scheduled">Scheduled</option>
-                          <option value="on_sale">On Sale</option>
-                          <option value="sold_out">Sold Out</option>
-                          <option value="cancelled">Cancelled</option>
-                          <option value="completed">Completed</option>
-                        </select>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="scheduled">Scheduled</SelectItem>
+                            <SelectItem value="on_sale">On Sale</SelectItem>
+                            <SelectItem value="sold_out">Sold Out</SelectItem>
+                            <SelectItem value="cancelled">Cancelled</SelectItem>
+                            <SelectItem value="completed">Completed</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
                     <div className="grid gap-4 md:grid-cols-2">

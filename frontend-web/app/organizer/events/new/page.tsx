@@ -10,6 +10,7 @@ import { ArrowLeft, Plus, Trash2, Calendar, Clock } from "lucide-react"
 import Link from "next/link"
 import { apiClient } from "@/lib/api/client"
 import { DatePicker } from "@/components/ui/date-picker"
+import { Textarea } from "@/components/ui/textarea"
 import { format } from "date-fns"
 
 interface ShowInput {
@@ -257,12 +258,12 @@ export default function CreateEventPage() {
 
             <div className="space-y-2">
               <Label htmlFor="description">Full Description</Label>
-              <textarea
+              <Textarea
                 id="description"
                 value={eventData.description}
                 onChange={(e) => handleEventChange("description", e.target.value)}
                 placeholder="Detailed description of your event"
-                className="w-full min-h-[100px] px-3 py-2 border border-input rounded-md bg-input"
+                className="min-h-[100px]"
               />
             </div>
 

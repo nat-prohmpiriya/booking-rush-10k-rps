@@ -236,9 +236,12 @@ export default function ProfilePage() {
                     <div className="h-28 w-28 rounded-full bg-linear-to-br from-primary to-amber-400 flex items-center justify-center text-3xl font-bold text-primary-foreground">
                       {user?.name ? getInitials(user.name) : "U"}
                     </div>
-                    <button className="absolute bottom-0 right-0 h-10 w-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg">
+                    <Button
+                      size="icon"
+                      className="absolute bottom-0 right-0 h-10 w-10 rounded-full bg-primary text-primary-foreground opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                    >
                       <Camera className="h-5 w-5" />
-                    </button>
+                    </Button>
                   </div>
 
                   {/* User Info */}

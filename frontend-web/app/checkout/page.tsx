@@ -568,12 +568,13 @@ function CheckoutContent() {
                   </Button>
                 )}
 
-                <button
+                <Button
+                  variant="ghost"
                   onClick={() => router.back()}
-                  className="w-full text-sm text-gray-500 hover:text-gray-300 py-2 transition-colors"
+                  className="w-full text-sm text-gray-500 hover:text-gray-300 py-2"
                 >
                   ← Go back
-                </button>
+                </Button>
               </div>
             </div>
 
