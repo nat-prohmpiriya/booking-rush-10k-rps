@@ -137,12 +137,29 @@ class ApiClient {
         const errorData = error.response?.data || {
           error: error.message,
           message: error.message,
+          code: undefined,
+        }
+
+        // Extract error message - handle nested error object from backend
+        let errorMessage = error.message
+        let errorCode: string | undefined
+
+        if (errorData.error && typeof errorData.error === "object") {
+          // Backend returns { success: false, error: { code, message } }
+          errorMessage = errorData.error.message || error.message
+          errorCode = errorData.error.code
+        } else if (errorData.message) {
+          errorMessage = errorData.message
+          errorCode = errorData.code
+        } else if (typeof errorData.error === "string") {
+          errorMessage = errorData.error
+          errorCode = errorData.code
         }
 
         throw new ApiRequestError(
-          errorData.message || errorData.error || error.message,
+          errorMessage,
           error.response?.status || 500,
-          errorData.code
+          errorCode
         )
       }
     )

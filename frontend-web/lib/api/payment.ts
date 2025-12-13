@@ -1,4 +1,5 @@
 import { apiClient } from "./client"
+import type { CreatePaymentIntentRequest, PaymentIntentResponse } from "./types"
 
 export interface PortalSessionResponse {
   url: string
@@ -20,6 +21,19 @@ export interface PaymentMethodsResponse {
 }
 
 export const paymentApi = {
+  /**
+   * Create a PaymentIntent for Stripe checkout
+   */
+  createPaymentIntent: async (
+    request: CreatePaymentIntentRequest
+  ): Promise<PaymentIntentResponse> => {
+    return apiClient.post<PaymentIntentResponse>("/payments/intent", request, {
+      headers: {
+        "X-Idempotency-Key": `payment-intent-${request.booking_id}-${Date.now()}`,
+      },
+    })
+  },
+
   /**
    * Create a Stripe Customer Portal session
    * Returns a URL to redirect the user to for managing payment methods

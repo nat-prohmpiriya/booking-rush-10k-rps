@@ -10,6 +10,18 @@ import (
 	"github.com/google/uuid"
 )
 
+// alphanumericChars for generating Stripe-compatible IDs
+const alphanumericChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+// randomAlphanumeric generates a random alphanumeric string of given length
+func randomAlphanumeric(length int) string {
+	b := make([]byte, length)
+	for i := range b {
+		b[i] = alphanumericChars[rand.Intn(len(alphanumericChars))]
+	}
+	return string(b)
+}
+
 // MockGateway implements PaymentGateway for testing and load testing
 type MockGateway struct {
 	config       *MockGatewayConfig
@@ -205,9 +217,9 @@ func (g *MockGateway) CreatePaymentIntent(ctx context.Context, req *PaymentInten
 		}
 	}
 
-	// Generate mock IDs
-	paymentIntentID := fmt.Sprintf("pi_mock_%s", uuid.New().String()[:12])
-	clientSecret := fmt.Sprintf("%s_secret_%s", paymentIntentID, uuid.New().String()[:8])
+	// Generate mock IDs - Stripe-compatible format (alphanumeric only)
+	paymentIntentID := fmt.Sprintf("pi_mock_%s", randomAlphanumeric(24))
+	clientSecret := fmt.Sprintf("%s_secret_%s", paymentIntentID, randomAlphanumeric(24))
 
 	// Store mock payment intent
 	g.transactions.Store(paymentIntentID, &TransactionInfo{

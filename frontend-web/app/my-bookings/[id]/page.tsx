@@ -127,6 +127,8 @@ export default function BookingDetailPage() {
   const [bookingDetail, setBookingDetail] = useState<BookingDetail | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isCancelling, setIsCancelling] = useState(false)
+  const [showCancelDialog, setShowCancelDialog] = useState(false)
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -183,6 +185,28 @@ export default function BookingDetailPage() {
       fetchBookingDetail()
     }
   }, [bookingId, isAuthenticated, authLoading, router])
+
+  const handleCancelBooking = async () => {
+    if (!bookingId) return
+
+    setIsCancelling(true)
+    try {
+      await bookingApi.releaseBooking(bookingId)
+      // Update local state to reflect cancellation
+      if (bookingDetail) {
+        setBookingDetail({
+          ...bookingDetail,
+          booking: { ...bookingDetail.booking, status: "cancelled" }
+        })
+      }
+      setShowCancelDialog(false)
+    } catch (err) {
+      console.error("Failed to cancel booking:", err)
+      setError("Failed to cancel booking. Please try again.")
+    } finally {
+      setIsCancelling(false)
+    }
+  }
 
   if (authLoading || isLoading) {
     return (
@@ -493,11 +517,57 @@ export default function BookingDetailPage() {
                     Complete Payment
                   </Button>
                 </Link>
-                <Button variant="outline" className="flex-1 border-red-500/50 text-red-400 hover:bg-red-500/10">
+                <Button
+                  variant="outline"
+                  className="flex-1 border-red-500/50 text-red-400 hover:bg-red-500/10"
+                  onClick={() => setShowCancelDialog(true)}
+                >
                   <XCircle className="w-4 h-4 mr-2" />
                   Cancel Booking
                 </Button>
               </>
+            )}
+
+            {/* Cancel Confirmation Dialog */}
+            {showCancelDialog && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+                <Card className="w-full max-w-md p-6 bg-zinc-900 border-red-800">
+                  <div className="text-center">
+                    <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4">
+                      <AlertCircle className="w-8 h-8 text-red-500" />
+                    </div>
+                    <h3 className="text-xl font-bold mb-2">Cancel Booking?</h3>
+                    <p className="text-muted-foreground mb-6">
+                      Are you sure you want to cancel this booking? Your reserved seats will be released and this action cannot be undone.
+                    </p>
+                    <div className="flex gap-3">
+                      <Button
+                        variant="outline"
+                        className="flex-1"
+                        onClick={() => setShowCancelDialog(false)}
+                        disabled={isCancelling}
+                      >
+                        Keep Booking
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        className="flex-1 bg-red-600 hover:bg-red-700"
+                        onClick={handleCancelBooking}
+                        disabled={isCancelling}
+                      >
+                        {isCancelling ? (
+                          <>
+                            <span className="animate-spin mr-2">⏳</span>
+                            Cancelling...
+                          </>
+                        ) : (
+                          "Yes, Cancel"
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              </div>
             )}
 
             {isCancelled && event?.slug && (

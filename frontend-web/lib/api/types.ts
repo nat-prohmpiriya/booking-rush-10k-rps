@@ -5,8 +5,14 @@ export interface ApiResponse<T> {
   message?: string
 }
 
+export interface ApiErrorDetails {
+  code?: string
+  message?: string
+}
+
 export interface ApiError {
-  error: string
+  success: false
+  error: ApiErrorDetails | string
   code?: string
   message?: string
 }
