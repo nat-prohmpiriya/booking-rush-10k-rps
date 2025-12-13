@@ -73,7 +73,7 @@ func NewContainer(cfg *ContainerConfig) *Container {
 	c.HealthHandler = handler.NewHealthHandler(c.DB, c.Redis)
 	c.BookingHandler = handler.NewBookingHandler(c.BookingService)
 	c.QueueHandler = handler.NewQueueHandler(c.QueueService)
-	c.AdminHandler = handler.NewAdminHandler(c.DB, c.Redis)
+	c.AdminHandler = handler.NewAdminHandler(c.Redis)
 
 	return c
 }

@@ -2,26 +2,37 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking/internal/dto"
-	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/database"
 	pkgredis "github.com/prohmpiriya/booking-rush-10k-rps/pkg/redis"
 )
 
 // AdminHandler handles admin HTTP requests
 type AdminHandler struct {
-	db    *database.PostgresDB
-	redis *pkgredis.Client
+	redis            *pkgredis.Client
+	ticketServiceURL string
+	httpClient       *http.Client
 }
 
 // NewAdminHandler creates a new admin handler
-func NewAdminHandler(db *database.PostgresDB, redis *pkgredis.Client) *AdminHandler {
+func NewAdminHandler(redis *pkgredis.Client) *AdminHandler {
+	ticketURL := os.Getenv("TICKET_SERVICE_URL")
+	if ticketURL == "" {
+		ticketURL = "http://localhost:8082"
+	}
+
 	return &AdminHandler{
-		db:    db,
-		redis: redis,
+		redis:            redis,
+		ticketServiceURL: ticketURL,
+		httpClient: &http.Client{
+			Timeout: 30 * time.Second,
+		},
 	}
 }
 
@@ -32,8 +43,24 @@ type SyncInventoryResponse struct {
 	ZonesSynced int    `json:"zones_synced"`
 }
 
+// ZoneFromTicketService represents zone data from ticket service API
+type ZoneFromTicketService struct {
+	ID             string `json:"id"`
+	ShowID         string `json:"show_id"`
+	Name           string `json:"name"`
+	AvailableSeats int    `json:"available_seats"`
+	TotalSeats     int    `json:"total_seats"`
+	IsActive       bool   `json:"is_active"`
+}
+
+// TicketServiceResponse represents the API response from ticket service
+type TicketServiceResponse struct {
+	Success bool                    `json:"success"`
+	Data    []ZoneFromTicketService `json:"data"`
+}
+
 // SyncInventory handles POST /admin/sync-inventory
-// Syncs zone availability from PostgreSQL to Redis
+// Syncs zone availability from Ticket Service API to Redis
 func (h *AdminHandler) SyncInventory(c *gin.Context) {
 	ctx := c.Request.Context()
 
@@ -54,98 +81,121 @@ func (h *AdminHandler) SyncInventory(c *gin.Context) {
 	})
 }
 
-// syncZoneAvailability syncs all zone availability from PostgreSQL to Redis
+// syncZoneAvailability syncs all zone availability from Ticket Service API to Redis
 func (h *AdminHandler) syncZoneAvailability(ctx context.Context) (int, error) {
-	// Query all active seat zones from PostgreSQL
-	query := `
-		SELECT id, available_seats
-		FROM seat_zones
-		WHERE is_active = true AND deleted_at IS NULL
-	`
-
-	rows, err := h.db.Pool().Query(ctx, query)
+	// Call ticket service API to get active zones
+	url := fmt.Sprintf("%s/api/v1/zones/active", h.ticketServiceURL)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
-		return 0, fmt.Errorf("failed to query seat zones: %w", err)
+		return 0, fmt.Errorf("failed to create request: %w", err)
 	}
-	defer rows.Close()
+
+	resp, err := h.httpClient.Do(req)
+	if err != nil {
+		return 0, fmt.Errorf("failed to call ticket service: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return 0, fmt.Errorf("ticket service returned status %d", resp.StatusCode)
+	}
+
+	var ticketResp TicketServiceResponse
+	if err := json.NewDecoder(resp.Body).Decode(&ticketResp); err != nil {
+		return 0, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	if !ticketResp.Success {
+		return 0, fmt.Errorf("ticket service returned error")
+	}
 
 	count := 0
-	for rows.Next() {
-		var zoneID string
-		var availableSeats int64
-
-		if err := rows.Scan(&zoneID, &availableSeats); err != nil {
-			continue
-		}
-
+	for _, zone := range ticketResp.Data {
 		// Set zone availability in Redis
-		key := fmt.Sprintf("zone:availability:%s", zoneID)
-		if err := h.redis.Set(ctx, key, availableSeats, 0).Err(); err != nil {
+		key := fmt.Sprintf("zone:availability:%s", zone.ID)
+		if err := h.redis.Set(ctx, key, zone.AvailableSeats, 0).Err(); err != nil {
 			continue
 		}
-
 		count++
-	}
-
-	if err := rows.Err(); err != nil {
-		return count, fmt.Errorf("error iterating rows: %w", err)
 	}
 
 	return count, nil
 }
 
 // GetInventoryStatus handles GET /admin/inventory-status
-// Returns current inventory status from both PostgreSQL and Redis
+// Returns current inventory status from Ticket Service API and Redis
 func (h *AdminHandler) GetInventoryStatus(c *gin.Context) {
 	ctx := c.Request.Context()
 
-	// Query zones from PostgreSQL
-	query := `
-		SELECT id, name, available_seats, reserved_seats, sold_seats, total_seats
-		FROM seat_zones
-		WHERE is_active = true AND deleted_at IS NULL
-		ORDER BY created_at DESC
-		LIMIT 100
-	`
-
-	rows, err := h.db.Pool().Query(ctx, query)
+	// Call ticket service API to get active zones
+	url := fmt.Sprintf("%s/api/v1/zones/active", h.ticketServiceURL)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
-			Error:   "failed to query zones",
-			Code:    "QUERY_FAILED",
+			Error:   "failed to create request",
+			Code:    "REQUEST_FAILED",
 			Message: err.Error(),
 		})
 		return
 	}
-	defer rows.Close()
+
+	resp, err := h.httpClient.Do(req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   "failed to call ticket service",
+			Code:    "SERVICE_CALL_FAILED",
+			Message: err.Error(),
+		})
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   "ticket service error",
+			Code:    "SERVICE_ERROR",
+			Message: fmt.Sprintf("ticket service returned status %d", resp.StatusCode),
+		})
+		return
+	}
+
+	var ticketResp TicketServiceResponse
+	if err := json.NewDecoder(resp.Body).Decode(&ticketResp); err != nil {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   "failed to decode response",
+			Code:    "DECODE_FAILED",
+			Message: err.Error(),
+		})
+		return
+	}
 
 	type ZoneStatus struct {
-		ZoneID         string `json:"zone_id"`
-		Name           string `json:"name"`
-		PGAvailable    int64  `json:"pg_available"`
-		PGReserved     int64  `json:"pg_reserved"`
-		PGSold         int64  `json:"pg_sold"`
-		PGTotal        int64  `json:"pg_total"`
-		RedisAvailable int64  `json:"redis_available"`
-		InSync         bool   `json:"in_sync"`
+		ZoneID          string `json:"zone_id"`
+		Name            string `json:"name"`
+		TicketAvailable int    `json:"ticket_available"`
+		TicketTotal     int    `json:"ticket_total"`
+		RedisAvailable  int64  `json:"redis_available"`
+		InSync          bool   `json:"in_sync"`
 	}
 
 	var zones []ZoneStatus
-	for rows.Next() {
-		var z ZoneStatus
-		if err := rows.Scan(&z.ZoneID, &z.Name, &z.PGAvailable, &z.PGReserved, &z.PGSold, &z.PGTotal); err != nil {
-			continue
+	for _, zone := range ticketResp.Data {
+		z := ZoneStatus{
+			ZoneID:          zone.ID,
+			Name:            zone.Name,
+			TicketAvailable: zone.AvailableSeats,
+			TicketTotal:     zone.TotalSeats,
 		}
 
 		// Get Redis value
-		key := fmt.Sprintf("zone:availability:%s", z.ZoneID)
+		key := fmt.Sprintf("zone:availability:%s", zone.ID)
 		val, err := h.redis.Get(ctx, key).Int64()
 		if err != nil {
 			z.RedisAvailable = -1 // Not set in Redis
 			z.InSync = false
 		} else {
 			z.RedisAvailable = val
-			z.InSync = (z.PGAvailable == z.RedisAvailable)
+			z.InSync = (int64(zone.AvailableSeats) == z.RedisAvailable)
 		}
 
 		zones = append(zones, z)

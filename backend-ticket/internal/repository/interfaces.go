@@ -129,4 +129,6 @@ type ShowZoneRepository interface {
 	Delete(ctx context.Context, id string) error
 	// UpdateAvailableSeats updates the available seats count
 	UpdateAvailableSeats(ctx context.Context, id string, availableSeats int) error
+	// ListActive retrieves all active zones (for inventory sync)
+	ListActive(ctx context.Context) ([]*domain.ShowZone, error)
 }

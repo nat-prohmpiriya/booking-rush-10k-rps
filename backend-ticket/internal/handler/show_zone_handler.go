@@ -168,6 +168,22 @@ func (h *ShowZoneHandler) Delete(c *gin.Context) {
 	c.JSON(http.StatusOK, response.Success(map[string]string{"message": "Zone deleted successfully"}))
 }
 
+// ListActive handles GET /zones/active - lists all active zones for inventory sync
+func (h *ShowZoneHandler) ListActive(c *gin.Context) {
+	zones, err := h.showZoneService.ListActiveZones(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, response.InternalError("Failed to list active zones"))
+		return
+	}
+
+	zoneResponses := make([]*dto.ShowZoneResponse, len(zones))
+	for i, zone := range zones {
+		zoneResponses[i] = toShowZoneResponse(zone)
+	}
+
+	c.JSON(http.StatusOK, response.Success(zoneResponses))
+}
+
 // toShowZoneResponse converts a domain show zone to response DTO
 func toShowZoneResponse(zone *domain.ShowZone) *dto.ShowZoneResponse {
 	resp := &dto.ShowZoneResponse{

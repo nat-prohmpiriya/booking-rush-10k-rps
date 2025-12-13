@@ -134,6 +134,9 @@ func (s *showZoneService) UpdateShowZone(ctx context.Context, id string, req *dt
 	if req.SortOrder != nil {
 		zone.SortOrder = *req.SortOrder
 	}
+	if req.IsActive != nil {
+		zone.IsActive = *req.IsActive
+	}
 
 	if err := s.showZoneRepo.Update(ctx, zone); err != nil {
 		return nil, err
@@ -154,4 +157,9 @@ func (s *showZoneService) DeleteShowZone(ctx context.Context, id string) error {
 	}
 
 	return s.showZoneRepo.Delete(ctx, id)
+}
+
+// ListActiveZones lists all active zones for inventory sync
+func (s *showZoneService) ListActiveZones(ctx context.Context) ([]*domain.ShowZone, error) {
+	return s.showZoneRepo.ListActive(ctx)
 }

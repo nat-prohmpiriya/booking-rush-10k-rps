@@ -221,3 +221,47 @@ func (r *PostgresShowZoneRepository) UpdateAvailableSeats(ctx context.Context, i
 	}
 	return nil
 }
+
+// ListActive retrieves all active zones for inventory sync
+func (r *PostgresShowZoneRepository) ListActive(ctx context.Context) ([]*domain.ShowZone, error) {
+	query := `SELECT ` + seatZoneColumns + ` FROM seat_zones
+		WHERE is_active = true AND deleted_at IS NULL
+		ORDER BY created_at DESC`
+	rows, err := r.pool.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var zones []*domain.ShowZone
+	for rows.Next() {
+		zone := &domain.ShowZone{}
+		err := rows.Scan(
+			&zone.ID,
+			&zone.ShowID,
+			&zone.Name,
+			&zone.Description,
+			&zone.Color,
+			&zone.Price,
+			&zone.Currency,
+			&zone.TotalSeats,
+			&zone.AvailableSeats,
+			&zone.ReservedSeats,
+			&zone.SoldSeats,
+			&zone.MinPerOrder,
+			&zone.MaxPerOrder,
+			&zone.IsActive,
+			&zone.SortOrder,
+			&zone.SaleStartAt,
+			&zone.SaleEndAt,
+			&zone.CreatedAt,
+			&zone.UpdatedAt,
+			&zone.DeletedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		zones = append(zones, zone)
+	}
+	return zones, nil
+}

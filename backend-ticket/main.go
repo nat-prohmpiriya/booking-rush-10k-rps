@@ -191,7 +191,8 @@ func main() {
 		// Zones endpoints - for direct zone access
 		zones := v1.Group("/zones")
 		{
-			// Public endpoints
+			// Public endpoints (note: /active must come before /:id to avoid route conflict)
+			zones.GET("/active", container.ShowZoneHandler.ListActive)
 			zones.GET("/:id", container.ShowZoneHandler.GetByID)
 
 			// Protected endpoints (Organizer/Admin only)

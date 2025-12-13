@@ -85,4 +85,6 @@ type ShowZoneService interface {
 	UpdateShowZone(ctx context.Context, id string, req *dto.UpdateShowZoneRequest) (*domain.ShowZone, error)
 	// DeleteShowZone soft deletes a show zone
 	DeleteShowZone(ctx context.Context, id string) error
+	// ListActiveZones lists all active zones for inventory sync
+	ListActiveZones(ctx context.Context) ([]*domain.ShowZone, error)
 }

@@ -36,7 +36,7 @@ type UpdateShowZoneRequest struct {
 
 // Validate validates the UpdateShowZoneRequest
 func (r *UpdateShowZoneRequest) Validate() (bool, string) {
-	if r.Name == "" && r.Price == nil && r.TotalSeats == nil && r.Description == "" && r.SortOrder == nil {
+	if r.Name == "" && r.Price == nil && r.TotalSeats == nil && r.Description == "" && r.SortOrder == nil && r.IsActive == nil {
 		return false, "At least one field must be provided for update"
 	}
 	if r.Price != nil && *r.Price < 0 {

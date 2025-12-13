@@ -96,6 +96,7 @@ services:
       - BOOKING_DATABASE_HOST=postgres
       - REDIS_HOST=redis
       - KAFKA_BROKERS=redpanda:9092
+      - TICKET_SERVICE_URL=http://ticket:8082
     env_file:
       - .env.local
     volumes:
