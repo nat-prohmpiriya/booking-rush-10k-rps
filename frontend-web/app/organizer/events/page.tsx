@@ -154,7 +154,7 @@ export default function OrganizerEventsPage() {
                       Edit
                     </Button>
                   </Link>
-                  <Link href={`/events/${event.slug || event.id}`} target="_blank">
+                  <Link href={`/events/${event.id}`} target="_blank">
                     <Button size="sm" variant="secondary">
                       <Eye className="h-4 w-4 mr-1" />
                       View
@@ -187,7 +187,7 @@ export default function OrganizerEventsPage() {
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
-                        <Link href={`/events/${event.slug || event.id}`} target="_blank">
+                        <Link href={`/events/${event.id}`} target="_blank">
                           <Eye className="h-4 w-4 mr-2" />
                           View Public Page
                         </Link>

@@ -19,11 +19,15 @@ import {
   Plus,
   Edit,
   Eye,
-  EyeOff,
   CheckCircle,
   Clock,
   AlertCircle,
+  DollarSign,
+  Users,
+  TrendingUp,
+  BarChart3,
 } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
 import { eventsApi, showsApi, zonesApi, UpdateEventRequest, UpdateShowRequest, UpdateZoneRequest } from "@/lib/api"
 import type { EventResponse, ShowResponse, ShowZoneResponse } from "@/lib/api/types"
 
@@ -225,6 +229,38 @@ export default function EditEventPage() {
     })
   }
 
+  // Calculate event stats from shows and zones
+  const calculateStats = () => {
+    let totalCapacity = 0
+    let totalSold = 0
+    let totalReserved = 0
+    let totalRevenue = 0
+
+    // Aggregate from all zones across all shows
+    Object.values(zonesByShow).forEach((zones) => {
+      zones.forEach((zone) => {
+        totalCapacity += zone.total_seats
+        totalSold += zone.sold_seats
+        totalReserved += zone.reserved_seats
+        totalRevenue += zone.sold_seats * zone.price
+      })
+    })
+
+    const totalAvailable = totalCapacity - totalSold - totalReserved
+    const occupancyRate = totalCapacity > 0 ? ((totalSold / totalCapacity) * 100).toFixed(1) : "0"
+
+    return {
+      totalCapacity,
+      totalSold,
+      totalReserved,
+      totalAvailable,
+      totalRevenue,
+      occupancyRate,
+    }
+  }
+
+  const stats = calculateStats()
+
   if (isLoading) {
     return (
       <div className="space-y-6 max-w-5xl">
@@ -276,7 +312,7 @@ export default function EditEventPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Link href={`/events/${event.slug}`} target="_blank">
+          <Link href={`/events/${event.id}`} target="_blank">
             <Button variant="outline">
               <Eye className="h-4 w-4 mr-2" />
               View Public
@@ -304,6 +340,65 @@ export default function EditEventPage() {
           {successMessage}
         </div>
       )}
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-blue-500/10">
+                <Users className="h-5 w-5 text-blue-500" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Total Capacity</p>
+                <p className="text-2xl font-bold">{stats.totalCapacity.toLocaleString()}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-green-500/10">
+                <Ticket className="h-5 w-5 text-green-500" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Tickets Sold</p>
+                <p className="text-2xl font-bold">{stats.totalSold.toLocaleString()}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-yellow-500/10">
+                <DollarSign className="h-5 w-5 text-yellow-500" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Revenue</p>
+                <p className="text-2xl font-bold">฿{stats.totalRevenue.toLocaleString()}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-purple-500/10">
+                <TrendingUp className="h-5 w-5 text-purple-500" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Occupancy</p>
+                <p className="text-2xl font-bold">{stats.occupancyRate}%</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -600,32 +695,27 @@ export default function EditEventPage() {
                                   style={{ backgroundColor: zone.color || "#888" }}
                                 />
                                 <div>
-                                  <div className="font-medium flex items-center gap-2">
+                                  <div className="font-medium">
                                     {zone.name}
-                                    {!zone.is_active && (
-                                      <Badge variant="secondary" className="text-xs">
-                                        Inactive
-                                      </Badge>
-                                    )}
                                   </div>
                                   <div className="text-sm text-muted-foreground">
                                     {zone.price.toLocaleString()} THB &bull; {zone.available_seats}/{zone.total_seats} available
                                   </div>
                                 </div>
                               </div>
-                              <div className="flex items-center gap-2">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleToggleZoneActive(zone)}
-                                  disabled={isSaving}
-                                >
-                                  {zone.is_active ? (
-                                    <EyeOff className="h-4 w-4" />
-                                  ) : (
-                                    <Eye className="h-4 w-4" />
-                                  )}
-                                </Button>
+                              <div className="flex items-center gap-4">
+                                {/* Active Toggle Switch */}
+                                <div className="flex items-center gap-2">
+                                  <Switch
+                                    checked={zone.is_active}
+                                    onCheckedChange={() => handleToggleZoneActive(zone)}
+                                    disabled={isSaving}
+                                  />
+                                  <span className={`text-sm font-medium ${zone.is_active ? "text-green-500" : "text-muted-foreground"}`}>
+                                    {zone.is_active ? "Active" : "Inactive"}
+                                  </span>
+                                </div>
+                                {/* Edit Button */}
                                 <Button
                                   variant="ghost"
                                   size="sm"
