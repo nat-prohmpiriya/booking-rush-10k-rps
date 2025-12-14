@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback, Suspense } from "react"
+import { useEffect, useState, useCallback, useRef, Suspense } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -28,6 +28,7 @@ function QueueWaitingRoomContent() {
   const [queuePassExpiresAt, setQueuePassExpiresAt] = useState<string>("")
   const [error, setError] = useState<string>("")
   const [dots, setDots] = useState("")
+  const hasJoinedRef = useRef(false)
 
   // Parse ticket selection
   const selectedTickets = ticketsParam ? JSON.parse(ticketsParam) : {}
@@ -40,6 +41,10 @@ function QueueWaitingRoomContent() {
       setQueueState("error")
       return
     }
+
+    // Prevent double call in Strict Mode (React 19)
+    if (hasJoinedRef.current) return
+    hasJoinedRef.current = true
 
     const joinQueue = async () => {
       try {

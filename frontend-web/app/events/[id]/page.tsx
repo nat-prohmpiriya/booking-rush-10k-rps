@@ -8,7 +8,7 @@ import { TicketSelector } from "@/components/event-detail/ticket-selector"
 import { StickyCheckout } from "@/components/event-detail/sticky-checkout"
 import { CountdownTimer } from "@/components/event-detail/countdown-timer"
 import { Header } from "@/components/header"
-import { useEventDetail, type TicketZoneDisplay } from "@/hooks/use-events"
+import { useEventDetail, useBookingSummary, type TicketZoneDisplay } from "@/hooks/use-events"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
 
@@ -17,6 +17,7 @@ export default function EventDetailPage() {
   const eventId = params.id as string
 
   const { event, shows, zones, selectedShow, isLoading, error, setSelectedShow } = useEventDetail(eventId)
+  const { bookingSummary } = useBookingSummary(eventId)
 
   const [selectedTickets, setSelectedTickets] = useState<Record<string, number>>({})
 
@@ -95,6 +96,8 @@ export default function EventDetailPage() {
     price: zone.price,
     available: zone.available,
     soldOut: zone.soldOut,
+    maxPerOrder: zone.maxPerOrder,
+    minPerOrder: zone.minPerOrder,
   }))
 
   // Check if event has ended (show date has passed)
@@ -174,7 +177,16 @@ export default function EventDetailPage() {
             />
 
             {zones.length > 0 ? (
-              <TicketSelector zones={ticketZones} selectedTickets={selectedTickets} onTicketChange={handleTicketChange} />
+              <TicketSelector
+                zones={ticketZones}
+                selectedTickets={selectedTickets}
+                onTicketChange={handleTicketChange}
+                bookingSummary={bookingSummary ? {
+                  bookedCount: bookingSummary.booked_count,
+                  maxAllowed: bookingSummary.max_allowed,
+                  remainingSlots: bookingSummary.remaining_slots,
+                } : null}
+              />
             ) : (
               <div className="bg-zinc-900/50 p-6 rounded-xl text-center">
                 <p className="text-zinc-400">No ticket zones available for this show.</p>

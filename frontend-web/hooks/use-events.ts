@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { eventsApi, showsApi, zonesApi } from "@/lib/api/events"
-import type { EventResponse, EventListFilter, ShowResponse, ShowZoneResponse } from "@/lib/api/types"
+import { bookingApi } from "@/lib/api/booking"
+import type { EventResponse, EventListFilter, ShowResponse, ShowZoneResponse, BookingSummaryResponse } from "@/lib/api/types"
 
 interface UseEventsReturn {
   events: EventDisplay[]
@@ -326,5 +327,55 @@ export function useEventDetail(eventId: string): EventDetailData & {
     isLoading,
     error,
     setSelectedShow,
+  }
+}
+
+// Hook for fetching user's booking summary for an event
+interface UseBookingSummaryReturn {
+  bookingSummary: BookingSummaryResponse | null
+  isLoading: boolean
+  error: string | null
+  refetch: () => Promise<void>
+}
+
+export function useBookingSummary(eventId: string): UseBookingSummaryReturn {
+  const [bookingSummary, setBookingSummary] = useState<BookingSummaryResponse | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const fetchBookingSummary = useCallback(async () => {
+    if (!eventId) return
+
+    // Check if user is logged in
+    const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null
+    if (!token) {
+      setBookingSummary(null)
+      return
+    }
+
+    setIsLoading(true)
+    setError(null)
+    try {
+      const response = await bookingApi.getBookingSummary(eventId)
+      setBookingSummary(response)
+    } catch (err) {
+      // Don't show error for 401 (user not logged in)
+      console.warn("Failed to fetch booking summary:", err)
+      setError("Failed to load booking summary")
+      setBookingSummary(null)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [eventId])
+
+  useEffect(() => {
+    fetchBookingSummary()
+  }, [fetchBookingSummary])
+
+  return {
+    bookingSummary,
+    isLoading,
+    error,
+    refetch: fetchBookingSummary,
   }
 }

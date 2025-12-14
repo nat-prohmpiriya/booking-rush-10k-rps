@@ -191,6 +191,14 @@ export interface BookingResponse {
   expires_at: string
 }
 
+export interface BookingSummaryResponse {
+  user_id: string
+  event_id: string
+  booked_count: number
+  max_allowed: number
+  remaining_slots: number
+}
+
 // Payment types
 export interface CreatePaymentRequest {
   booking_id: string

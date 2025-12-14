@@ -5,6 +5,7 @@ import type {
   ConfirmBookingRequest,
   ConfirmBookingResponse,
   BookingResponse,
+  BookingSummaryResponse,
   CreatePaymentRequest,
   PaymentResponse,
   CreatePaymentIntentRequest,
@@ -53,6 +54,10 @@ export const bookingApi = {
       return response
     }
     return response.data || []
+  },
+
+  async getBookingSummary(eventId: string): Promise<BookingSummaryResponse> {
+    return apiClient.get<BookingSummaryResponse>(`/bookings/summary?event_id=${eventId}`)
   },
 }
 
