@@ -26,6 +26,7 @@ function QueueWaitingRoomContent() {
   const [queueToken, setQueueToken] = useState<string>("")
   const [queuePass, setQueuePass] = useState<string>("")
   const [queuePassExpiresAt, setQueuePassExpiresAt] = useState<string>("")
+  const [passCountdown, setPassCountdown] = useState<number>(300) // 5 minutes default
   const [error, setError] = useState<string>("")
   const [dots, setDots] = useState("")
   const hasJoinedRef = useRef(false)
@@ -132,11 +133,44 @@ function QueueWaitingRoomContent() {
     return () => clearInterval(interval)
   }, [])
 
+  // Queue Pass countdown timer
+  useEffect(() => {
+    if (queueState !== "ready" || !queuePassExpiresAt) return
+
+    const calculateRemaining = () => {
+      const expiresAt = new Date(queuePassExpiresAt).getTime()
+      const now = Date.now()
+      const remaining = Math.max(0, Math.floor((expiresAt - now) / 1000))
+      setPassCountdown(remaining)
+      return remaining
+    }
+
+    // Initial calculation
+    calculateRemaining()
+
+    // Update every second
+    const interval = setInterval(() => {
+      const remaining = calculateRemaining()
+      if (remaining <= 0) {
+        clearInterval(interval)
+      }
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [queueState, queuePassExpiresAt])
+
   // Format estimated wait time
   const formatWaitTime = (seconds: number) => {
     if (seconds < 60) return `${seconds} seconds`
     const minutes = Math.ceil(seconds / 60)
     return `${minutes} ${minutes === 1 ? "minute" : "minutes"}`
+  }
+
+  // Format countdown as MM:SS
+  const formatCountdown = (seconds: number) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins}:${secs.toString().padStart(2, "0")}`
   }
 
   // Leave queue handler
@@ -205,7 +239,9 @@ function QueueWaitingRoomContent() {
 
           <Card className="bg-[#1a1a1a] border-green-800/50 p-6">
             <p className="text-sm text-gray-400 mb-2">Your Queue Pass expires in</p>
-            <p className="text-2xl font-bold text-green-400">5:00</p>
+            <p className={`text-2xl font-bold ${passCountdown <= 60 ? "text-red-400 animate-pulse" : "text-green-400"}`}>
+              {formatCountdown(passCountdown)}
+            </p>
             <p className="text-xs text-gray-500 mt-2">Complete your booking before it expires</p>
           </Card>
         </div>
