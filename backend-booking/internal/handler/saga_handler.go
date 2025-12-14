@@ -75,6 +75,7 @@ func (h *SagaHandler) StartBookingSaga(c *gin.Context) {
 		BookingID:     "", // Will be generated
 		UserID:        userID,
 		EventID:       req.EventID,
+		ShowID:        req.ShowID,
 		ZoneID:        req.ZoneID,
 		Quantity:      req.Quantity,
 		TotalPrice:    req.TotalPrice,

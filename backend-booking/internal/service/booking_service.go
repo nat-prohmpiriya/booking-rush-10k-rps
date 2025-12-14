@@ -32,6 +32,9 @@ type BookingService interface {
 	// GetUserBookings retrieves all bookings for a user
 	GetUserBookings(ctx context.Context, userID string, page, pageSize int) (*dto.PaginatedResponse, error)
 
+	// GetUserBookingSummary retrieves user's booking summary for an event
+	GetUserBookingSummary(ctx context.Context, userID, eventID string) (*dto.UserBookingSummaryResponse, error)
+
 	// GetPendingBookings retrieves pending reservations that are about to expire
 	GetPendingBookings(ctx context.Context, limit int) ([]*dto.BookingResponse, error)
 
@@ -474,6 +477,38 @@ func (s *bookingService) GetUserBookings(ctx context.Context, userID string, pag
 		Data:     responses,
 		Page:     page,
 		PageSize: pageSize,
+	}, nil
+}
+
+// GetUserBookingSummary retrieves user's booking summary for an event
+func (s *bookingService) GetUserBookingSummary(ctx context.Context, userID, eventID string) (*dto.UserBookingSummaryResponse, error) {
+	// Validate inputs
+	if userID == "" {
+		return nil, domain.ErrInvalidUserID
+	}
+	if eventID == "" {
+		return nil, domain.ErrInvalidEventID
+	}
+
+	// Get count from PostgreSQL (confirmed + reserved bookings)
+	bookedCount, err := s.bookingRepo.CountByUserAndEvent(ctx, userID, eventID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Calculate remaining slots
+	maxAllowed := s.maxPerUser
+	remainingSlots := maxAllowed - bookedCount
+	if remainingSlots < 0 {
+		remainingSlots = 0
+	}
+
+	return &dto.UserBookingSummaryResponse{
+		UserID:         userID,
+		EventID:        eventID,
+		BookedCount:    bookedCount,
+		MaxAllowed:     maxAllowed,
+		RemainingSlots: remainingSlots,
 	}, nil
 }
 

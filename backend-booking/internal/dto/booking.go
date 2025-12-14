@@ -60,6 +60,15 @@ type BookingResponse struct {
 	ExpiresAt   time.Time  `json:"expires_at"`
 }
 
+// UserBookingSummaryResponse represents user's booking summary for an event
+type UserBookingSummaryResponse struct {
+	UserID       string `json:"user_id"`
+	EventID      string `json:"event_id"`
+	BookedCount  int    `json:"booked_count"`   // Total tickets booked (confirmed + reserved)
+	MaxAllowed   int    `json:"max_allowed"`    // Maximum allowed per user
+	RemainingSlots int  `json:"remaining_slots"` // How many more can be booked
+}
+
 // FromDomain converts domain Booking to BookingResponse
 func FromDomain(b *domain.Booking) *BookingResponse {
 	return &BookingResponse{

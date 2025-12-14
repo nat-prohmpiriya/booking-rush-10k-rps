@@ -14,6 +14,7 @@ import (
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/database"
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/logger"
 	pkgsaga "github.com/prohmpiriya/booking-rush-10k-rps/pkg/saga"
+	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/telemetry"
 )
 
 func main() {
@@ -40,7 +41,24 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Initialize database connection for saga store
+	// Initialize OpenTelemetry tracing
+	if cfg.OTel.Enabled {
+		_, err := telemetry.Init(ctx, &telemetry.Config{
+			Enabled:       true,
+			ServiceName:   "saga-orchestrator",
+			CollectorAddr: cfg.OTel.CollectorAddr,
+			SampleRatio:   cfg.OTel.SampleRatio,
+			Environment:   cfg.App.Environment,
+		})
+		if err != nil {
+			appLog.Warn(fmt.Sprintf("Failed to initialize tracer (continuing without tracing): %v", err))
+		} else {
+			defer telemetry.Shutdown(ctx)
+			appLog.Info("OpenTelemetry tracing initialized")
+		}
+	}
+
+	// Initialize PostgreSQL connection for saga store (primary source of truth)
 	dbCfg := &database.PostgresConfig{
 		Host:          cfg.BookingDatabase.Host,
 		Port:          cfg.BookingDatabase.Port,
@@ -48,21 +66,21 @@ func main() {
 		Password:      cfg.BookingDatabase.Password,
 		Database:      cfg.BookingDatabase.DBName,
 		SSLMode:       cfg.BookingDatabase.SSLMode,
-		MaxConns:      10,
-		MinConns:      2,
+		MaxConns:      20,
+		MinConns:      5,
 		MaxRetries:    3,
 		RetryInterval: 2 * time.Second,
 	}
 	db, err := database.NewPostgres(ctx, dbCfg)
 	if err != nil {
-		appLog.Fatal(fmt.Sprintf("Failed to connect to database: %v", err))
+		appLog.Fatal(fmt.Sprintf("Failed to connect to PostgreSQL: %v", err))
 	}
 	defer db.Close()
-	appLog.Info("Database connected")
+	appLog.Info("PostgreSQL connected")
 
-	// Initialize saga store (using memory store for now, can switch to postgres later)
-	store := pkgsaga.NewMemoryStore()
-	appLog.Info("Saga store initialized")
+	// Initialize saga store using PostgreSQL (durable state persistence)
+	store := pkgsaga.NewPostgresStore(db.Pool())
+	appLog.Info("Saga store initialized (PostgreSQL)")
 
 	// Initialize Kafka producer
 	producer, err := saga.NewKafkaSagaProducer(ctx, &saga.KafkaSagaProducerConfig{
@@ -84,15 +102,25 @@ func main() {
 		Logger: &saga.ZapLogger{},
 	})
 
-	// Register booking saga definition
+	// Register booking saga definition (legacy - for backward compatibility)
 	sagaBuilder := saga.NewBookingSagaBuilder(&saga.BookingSagaConfig{
 		StepTimeout: 30 * time.Second,
 		MaxRetries:  2,
 	})
 	if err := orchestrator.RegisterDefinition(sagaBuilder.Build()); err != nil {
-		appLog.Fatal(fmt.Sprintf("Failed to register saga definition: %v", err))
+		appLog.Fatal(fmt.Sprintf("Failed to register booking saga definition: %v", err))
 	}
-	appLog.Info("Booking saga definition registered")
+	appLog.Info("Booking saga definition registered (legacy)")
+
+	// Register post-payment saga definition (new - triggered after payment success)
+	postPaymentSagaBuilder := saga.NewPostPaymentSagaBuilder(&saga.PostPaymentSagaConfig{
+		StepTimeout: 30 * time.Second,
+		MaxRetries:  3,
+	})
+	if err := orchestrator.RegisterDefinition(postPaymentSagaBuilder.Build()); err != nil {
+		appLog.Fatal(fmt.Sprintf("Failed to register post-payment saga definition: %v", err))
+	}
+	appLog.Info("Post-payment saga definition registered")
 
 	// Create event handler
 	eventHandler := saga.NewOrchestratorEventHandler(orchestrator, producer, store)
@@ -116,10 +144,34 @@ func main() {
 	defer consumer.Stop()
 	appLog.Info("Kafka consumer connected")
 
-	// Start consumer
+	// Start saga event consumer
 	go func() {
 		if err := consumer.Start(ctx); err != nil {
-			appLog.Error(fmt.Sprintf("Consumer error: %v", err))
+			appLog.Error(fmt.Sprintf("Saga event consumer error: %v", err))
+		}
+	}()
+
+	// Initialize payment success consumer (triggers post-payment saga)
+	paymentConsumer, err := saga.NewPaymentSuccessConsumer(ctx, &saga.PaymentSuccessConsumerConfig{
+		Brokers:          cfg.Kafka.Brokers,
+		GroupID:          "saga-orchestrator-payment",
+		ClientID:         "saga-orchestrator-payment-consumer",
+		Store:            store,
+		Producer:         producer,
+		Logger:           &saga.ZapLogger{},
+		SessionTimeout:   30 * time.Second,
+		RebalanceTimeout: 60 * time.Second,
+	})
+	if err != nil {
+		appLog.Fatal(fmt.Sprintf("Failed to create payment success consumer: %v", err))
+	}
+	defer paymentConsumer.Stop()
+	appLog.Info("Payment success consumer connected (topic: payment.success)")
+
+	// Start payment success consumer
+	go func() {
+		if err := paymentConsumer.Start(ctx); err != nil {
+			appLog.Error(fmt.Sprintf("Payment success consumer error: %v", err))
 		}
 	}()
 

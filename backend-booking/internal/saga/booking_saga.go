@@ -1,3 +1,30 @@
+// Package saga provides the booking saga implementation using the Saga pattern.
+//
+// # Architecture Overview
+//
+// This implementation uses an EVENT-DRIVEN approach with Kafka:
+//
+//  1. Saga Orchestrator (cmd/saga-orchestrator):
+//     - Consumes events from workers
+//     - Manages saga state transitions
+//     - Sends commands to workers via Kafka
+//
+//  2. Step Workers (separate processes):
+//     - saga_step_worker: handles reserve-seats, confirm-booking, release-seats
+//     - saga-payment-worker: handles process-payment, refund-payment
+//
+//  3. Flow:
+//     API creates saga instance → sends first command to Kafka →
+//     Worker executes → sends event → Orchestrator advances saga →
+//     sends next command → repeat until complete or compensate
+//
+// The step functions (reserveSeatsExecute, processPaymentExecute, etc.) in this file
+// are PLACEHOLDER implementations used only for:
+// - Defining the saga steps structure (name, timeout, retries)
+// - Direct execution mode (not currently used in production)
+// - Testing purposes
+//
+// In production, actual step execution happens in the dedicated workers.
 package saga
 
 import (
@@ -9,14 +36,25 @@ import (
 )
 
 const (
-	// BookingSagaName is the name of the booking saga
+	// BookingSagaName is the name of the booking saga (legacy - for backward compatibility)
 	BookingSagaName = "booking-saga"
 
-	// Step names
-	StepReserveSeats    = "reserve-seats"
-	StepProcessPayment  = "process-payment"
-	StepConfirmBooking  = "confirm-booking"
-	StepSendNotification = "send-notification"
+	// PostPaymentSagaName is the name of the post-payment saga
+	// This saga runs AFTER payment success (triggered by payment.success Kafka event)
+	PostPaymentSagaName = "post-payment-saga"
+
+	// Step names - these are used by both orchestrator and workers
+	// Legacy steps (not used in new flow)
+	StepReserveSeats   = "reserve-seats"   // Now handled by fast path (Redis Lua)
+	StepProcessPayment = "process-payment" // Now handled by Stripe directly
+
+	// Post-payment saga steps
+	StepConfirmBooking   = "confirm-booking"   // Update status, remove TTL
+	StepSendNotification = "send-notification" // Optional email notification
+
+	// Compensation steps
+	StepRefundPayment = "refund-payment" // Refund via Stripe
+	StepReleaseSeats  = "release-seats"  // Release seats back to Redis
 )
 
 // BookingSagaData contains the data passed through the booking saga
@@ -24,7 +62,9 @@ type BookingSagaData struct {
 	// Input data
 	BookingID      string  `json:"booking_id"`
 	UserID         string  `json:"user_id"`
+	TenantID       string  `json:"tenant_id"`
 	EventID        string  `json:"event_id"`
+	ShowID         string  `json:"show_id"`
 	ZoneID         string  `json:"zone_id"`
 	Quantity       int     `json:"quantity"`
 	TotalPrice     float64 `json:"total_price"`
@@ -44,7 +84,9 @@ func (d *BookingSagaData) ToMap() map[string]interface{} {
 	return map[string]interface{}{
 		"booking_id":        d.BookingID,
 		"user_id":           d.UserID,
+		"tenant_id":         d.TenantID,
 		"event_id":          d.EventID,
+		"show_id":           d.ShowID,
 		"zone_id":           d.ZoneID,
 		"quantity":          d.Quantity,
 		"total_price":       d.TotalPrice,
@@ -66,8 +108,14 @@ func (d *BookingSagaData) FromMap(m map[string]interface{}) {
 	if v, ok := m["user_id"].(string); ok {
 		d.UserID = v
 	}
+	if v, ok := m["tenant_id"].(string); ok {
+		d.TenantID = v
+	}
 	if v, ok := m["event_id"].(string); ok {
 		d.EventID = v
+	}
+	if v, ok := m["show_id"].(string); ok {
+		d.ShowID = v
 	}
 	if v, ok := m["zone_id"].(string); ok {
 		d.ZoneID = v
@@ -186,15 +234,15 @@ func (b *BookingSagaBuilder) Build() *pkgsaga.Definition {
 		Retries:     b.config.MaxRetries,
 	})
 
-	// Step 4: Send Notification
-	def.AddStep(&pkgsaga.Step{
-		Name:        StepSendNotification,
-		Description: "Send booking confirmation notification",
-		Execute:     b.sendNotificationExecute,
-		Compensate:  nil, // Notification failure is not critical
-		Timeout:     b.config.StepTimeout,
-		Retries:     b.config.MaxRetries,
-	})
+	// Step 4: Send Notification - TODO: Enable when notification service is ready
+	// def.AddStep(&pkgsaga.Step{
+	// 	Name:        StepSendNotification,
+	// 	Description: "Send booking confirmation notification",
+	// 	Execute:     b.sendNotificationExecute,
+	// 	Compensate:  nil, // Notification failure is not critical
+	// 	Timeout:     b.config.StepTimeout,
+	// 	Retries:     b.config.MaxRetries,
+	// })
 
 	return def
 }
@@ -338,4 +386,68 @@ func (b *BookingSagaBuilder) sendNotificationExecute(ctx context.Context, data m
 	return map[string]interface{}{
 		"notification_id": notificationID,
 	}, nil
+}
+
+// ============================================================================
+// POST-PAYMENT SAGA - Runs after payment success (triggered by webhook)
+// ============================================================================
+
+// PostPaymentSagaConfig holds configuration for the post-payment saga
+type PostPaymentSagaConfig struct {
+	StepTimeout time.Duration
+	MaxRetries  int
+}
+
+// PostPaymentSagaBuilder creates a post-payment saga definition
+type PostPaymentSagaBuilder struct {
+	config *PostPaymentSagaConfig
+}
+
+// NewPostPaymentSagaBuilder creates a new post-payment saga builder
+func NewPostPaymentSagaBuilder(config *PostPaymentSagaConfig) *PostPaymentSagaBuilder {
+	if config == nil {
+		config = &PostPaymentSagaConfig{}
+	}
+	if config.StepTimeout == 0 {
+		config.StepTimeout = 30 * time.Second
+	}
+	if config.MaxRetries == 0 {
+		config.MaxRetries = 3
+	}
+	return &PostPaymentSagaBuilder{config: config}
+}
+
+// Build creates the post-payment saga definition
+// This saga runs AFTER payment success and confirms the booking
+func (b *PostPaymentSagaBuilder) Build() *pkgsaga.Definition {
+	def := pkgsaga.NewDefinition(PostPaymentSagaName, "Post-payment booking confirmation saga")
+	def.WithTimeout(1 * time.Minute)
+
+	// Step 1: Confirm Booking
+	// - Update booking status to confirmed in PostgreSQL
+	// - Remove TTL from Redis (make reservation permanent)
+	// - Generate confirmation code
+	def.AddStep(&pkgsaga.Step{
+		Name:        StepConfirmBooking,
+		Description: "Confirm booking after payment success",
+		Execute:     nil, // Executed by saga_step_worker
+		Compensate:  nil, // Compensation handled separately (refund + release)
+		Timeout:     b.config.StepTimeout,
+		Retries:     b.config.MaxRetries,
+	})
+
+	// Step 2: Send Notification (NON-CRITICAL)
+	// - Send booking confirmation email/SMS
+	// - If fails: Retry → DLQ (NO refund, NO seat release)
+	// - Compensate is nil because notification failure should NOT trigger rollback
+	def.AddStep(&pkgsaga.Step{
+		Name:        StepSendNotification,
+		Description: "Send booking confirmation notification",
+		Execute:     nil, // Executed by saga_step_worker (mock for now)
+		Compensate:  nil, // NON-CRITICAL: No compensation - just retry and DLQ
+		Timeout:     b.config.StepTimeout,
+		Retries:     5, // More retries for non-critical step
+	})
+
+	return def
 }

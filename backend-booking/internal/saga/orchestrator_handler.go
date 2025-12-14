@@ -129,7 +129,7 @@ func (h *OrchestratorEventHandler) HandleStepFailure(ctx context.Context, event 
 	})
 
 	// Set error and start compensation
-	instance.SetError(fmt.Errorf(event.ErrorMessage))
+	instance.SetError(fmt.Errorf("%s", event.ErrorMessage))
 	instance.SetStatus(pkgsaga.StatusCompensating)
 
 	if err := h.store.Update(ctx, instance); err != nil {

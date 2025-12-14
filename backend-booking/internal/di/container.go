@@ -1,8 +1,6 @@
 package di
 
 import (
-	"time"
-
 	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking/internal/handler"
 	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking/internal/repository"
 	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking/internal/saga"
@@ -53,7 +51,8 @@ type ContainerConfig struct {
 	SagaProducer       saga.SagaProducer
 	SagaStore          pkgsaga.Store
 	SagaServiceConfig  *service.SagaServiceConfig
-	UseSagaForBooking  bool // Enable saga-based booking (default: false)
+	// Note: Saga is now triggered asynchronously after payment success via webhook
+	// Booking handler always uses fast path (Redis Lua + PostgreSQL)
 }
 
 // NewContainer creates a new dependency injection container
@@ -98,15 +97,9 @@ func NewContainer(cfg *ContainerConfig) *Container {
 	// Initialize handlers
 	c.HealthHandler = handler.NewHealthHandler(c.DB, c.Redis)
 
-	// Use saga-based booking handler if enabled
-	if cfg.UseSagaForBooking && c.SagaService != nil {
-		c.BookingHandler = handler.NewBookingHandlerWithSaga(c.BookingService, c.SagaService, &handler.BookingHandlerConfig{
-			UseSaga:     true,
-			SagaTimeout: 30 * time.Second,
-		})
-	} else {
-		c.BookingHandler = handler.NewBookingHandler(c.BookingService)
-	}
+	// Booking handler uses fast path (Redis Lua + PostgreSQL)
+	// Saga is triggered asynchronously after payment success via webhook
+	c.BookingHandler = handler.NewBookingHandler(c.BookingService)
 
 	c.QueueHandler = handler.NewQueueHandler(c.QueueService)
 	c.AdminHandler = handler.NewAdminHandler(c.Redis)

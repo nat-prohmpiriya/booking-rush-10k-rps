@@ -28,6 +28,9 @@ type SagaProducer interface {
 	// Timeout
 	ScheduleTimeoutCheck(ctx context.Context, check *TimeoutCheck) error
 
+	// Generic publish (for DLQ and other topics)
+	Publish(ctx context.Context, topic string, key string, value []byte) error
+
 	// Close
 	Close() error
 }
@@ -261,6 +264,23 @@ func (p *KafkaSagaProducer) ScheduleTimeoutCheck(ctx context.Context, check *Tim
 	return nil
 }
 
+// Publish publishes raw bytes to a topic (used for DLQ and other generic publishing)
+func (p *KafkaSagaProducer) Publish(ctx context.Context, topic string, key string, value []byte) error {
+	msg := &kafka.Message{
+		Topic: topic,
+		Key:   []byte(key),
+		Value: value,
+	}
+	if err := p.producer.Produce(ctx, msg); err != nil {
+		p.logger.Error("Failed to publish message",
+			"topic", topic,
+			"key", key,
+			"error", err)
+		return fmt.Errorf("failed to publish message: %w", err)
+	}
+	return nil
+}
+
 // Close closes the Kafka producer
 func (p *KafkaSagaProducer) Close() error {
 	p.producer.Close()
@@ -275,8 +295,16 @@ type MockSagaProducer struct {
 	FailureEvents        []*SagaEvent
 	LifecycleEvents      []*SagaLifecycleEvent
 	TimeoutChecks        []*TimeoutCheck
+	PublishedMessages    []PublishedMessage
 	ShouldFail           bool
 	FailureError         error
+}
+
+// PublishedMessage represents a message published via Publish method
+type PublishedMessage struct {
+	Topic string
+	Key   string
+	Value []byte
 }
 
 // NewMockSagaProducer creates a new mock saga producer
@@ -288,6 +316,7 @@ func NewMockSagaProducer() *MockSagaProducer {
 		FailureEvents:        make([]*SagaEvent, 0),
 		LifecycleEvents:      make([]*SagaLifecycleEvent, 0),
 		TimeoutChecks:        make([]*TimeoutCheck, 0),
+		PublishedMessages:    make([]PublishedMessage, 0),
 	}
 }
 
@@ -390,6 +419,21 @@ func (m *MockSagaProducer) ScheduleTimeoutCheck(ctx context.Context, check *Time
 	return nil
 }
 
+func (m *MockSagaProducer) Publish(ctx context.Context, topic string, key string, value []byte) error {
+	if m.ShouldFail {
+		if m.FailureError != nil {
+			return m.FailureError
+		}
+		return fmt.Errorf("mock producer failure")
+	}
+	m.PublishedMessages = append(m.PublishedMessages, PublishedMessage{
+		Topic: topic,
+		Key:   key,
+		Value: value,
+	})
+	return nil
+}
+
 func (m *MockSagaProducer) Close() error {
 	return nil
 }
@@ -402,6 +446,7 @@ func (m *MockSagaProducer) Clear() {
 	m.FailureEvents = make([]*SagaEvent, 0)
 	m.LifecycleEvents = make([]*SagaLifecycleEvent, 0)
 	m.TimeoutChecks = make([]*TimeoutCheck, 0)
+	m.PublishedMessages = make([]PublishedMessage, 0)
 }
 
 // GetLifecycleEventsByStatus returns lifecycle events filtered by status
