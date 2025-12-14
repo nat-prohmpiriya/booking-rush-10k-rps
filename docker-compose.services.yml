@@ -89,8 +89,8 @@ services:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:8083/health"]
       interval: 10s
       timeout: 5s
-      retries: 3
-      start_period: 30s
+      retries: 5
+      start_period: 60s
     networks:
       - booking-rush-local
 

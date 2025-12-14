@@ -54,6 +54,22 @@ services:
       - booking-rush-local
 
   # ---------------------------------------------------------------------------
+  # Redis Insight - Web UI for Redis management
+  # ---------------------------------------------------------------------------
+  redis-insight:
+    image: redis/redisinsight:latest
+    container_name: booking-rush-redis-insight
+    ports:
+      - "5540:5540"
+    volumes:
+      - redis-insight-data:/data
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - booking-rush-local
+
+  # ---------------------------------------------------------------------------
   # Redpanda - Kafka-compatible message queue
   # ---------------------------------------------------------------------------
   redpanda:
@@ -115,6 +131,7 @@ services:
 volumes:
   postgres-data:
   redis-data:
+  redis-insight-data:
   redpanda-data:
 
 networks:
