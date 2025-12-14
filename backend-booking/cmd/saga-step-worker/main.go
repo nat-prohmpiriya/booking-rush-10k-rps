@@ -17,6 +17,7 @@ import (
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/kafka"
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/logger"
 	pkgredis "github.com/prohmpiriya/booking-rush-10k-rps/pkg/redis"
+	pkgsaga "github.com/prohmpiriya/booking-rush-10k-rps/pkg/saga"
 )
 
 func main() {
@@ -100,6 +101,7 @@ func main() {
 			saga.TopicSagaReserveSeatsCommand,
 			saga.TopicSagaReleaseSeatsCommand,
 			saga.TopicSagaConfirmBookingCommand,
+			saga.TopicSagaSendNotificationCommand, // NON-CRITICAL step
 		},
 		ClientID:       "saga-step-worker-booking",
 		MaxRetries:     3,
@@ -127,12 +129,21 @@ func main() {
 	defer producer.Close()
 	appLog.Info("Kafka producer connected")
 
+	// Initialize saga store for DLQ persistence
+	sagaStore := pkgsaga.NewPostgresStore(db.Pool())
+	appLog.Info("Saga store initialized for DLQ")
+
+	// Create DLQ handler for non-critical steps
+	dlqHandler := saga.NewDLQHandler(producer, sagaStore, &saga.ZapLogger{})
+	appLog.Info("DLQ handler initialized")
+
 	// Create step worker
 	stepWorker := worker.NewSagaStepWorker(
 		consumer,
 		producer,
 		bookingRepo,
 		reservationRepo,
+		dlqHandler, // DLQ handler for non-critical step failures
 		&worker.SagaStepWorkerConfig{
 			WorkerCount:   5,
 			RetryAttempts: 3,

@@ -225,7 +225,12 @@ func handleProcessPayment(ctx context.Context, record *kafka.Record, paymentServ
 
 	// Extract data
 	bookingID := getString(command.Data, "booking_id")
+	if bookingID == "" {
+		// Fallback to reservation_id (returned by reserve-seats step)
+		bookingID = getString(command.Data, "reservation_id")
+	}
 	userID := getString(command.Data, "user_id")
+	tenantID := getString(command.Data, "tenant_id")
 	totalPrice := getFloat(command.Data, "total_price")
 	currency := getString(command.Data, "currency")
 	if currency == "" {
@@ -234,11 +239,12 @@ func handleProcessPayment(ctx context.Context, record *kafka.Record, paymentServ
 
 	// Create payment
 	payment, err := paymentService.CreatePayment(ctx, &service.CreatePaymentRequest{
+		TenantID:  tenantID,
 		BookingID: bookingID,
 		UserID:    userID,
 		Amount:    totalPrice,
 		Currency:  currency,
-		Method:    "card",
+		Method:    "credit_card",
 	})
 
 	var resultData map[string]interface{}
@@ -251,7 +257,7 @@ func handleProcessPayment(ctx context.Context, record *kafka.Record, paymentServ
 		processedPayment, err := paymentService.ProcessPayment(ctx, payment.ID)
 		if err != nil {
 			execErr = err
-		} else if processedPayment.Status != "completed" {
+		} else if processedPayment.Status != "succeeded" {
 			execErr = fmt.Errorf("payment failed: %s", processedPayment.ErrorMessage)
 		} else {
 			resultData = map[string]interface{}{
