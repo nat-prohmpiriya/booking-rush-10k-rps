@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/redis/go-redis/v9"
 )
 
 var (
@@ -323,4 +325,30 @@ func (s *RedisStore) GetPendingCompensations(ctx context.Context, limit int) ([]
 	}
 
 	return result, nil
+}
+
+// RedisClientAdapter adapts go-redis client to RedisClient interface
+type RedisClientAdapter struct {
+	client *redis.Client
+}
+
+// NewRedisClientAdapter creates a new adapter for go-redis client
+func NewRedisClientAdapter(client *redis.Client) *RedisClientAdapter {
+	return &RedisClientAdapter{client: client}
+}
+
+func (a *RedisClientAdapter) Get(ctx context.Context, key string) (string, error) {
+	return a.client.Get(ctx, key).Result()
+}
+
+func (a *RedisClientAdapter) Set(ctx context.Context, key string, value interface{}, expiration time.Duration) error {
+	return a.client.Set(ctx, key, value, expiration).Err()
+}
+
+func (a *RedisClientAdapter) Del(ctx context.Context, keys ...string) error {
+	return a.client.Del(ctx, keys...).Err()
+}
+
+func (a *RedisClientAdapter) Keys(ctx context.Context, pattern string) ([]string, error) {
+	return a.client.Keys(ctx, pattern).Result()
 }
