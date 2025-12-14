@@ -414,6 +414,11 @@ func (r *PostgresEventRepository) List(ctx context.Context, filter *EventFilter,
 			args = append(args, filter.TenantID)
 			argIndex++
 		}
+		if filter.OrganizerID != "" {
+			conditions = append(conditions, fmt.Sprintf("organizer_id = $%d", argIndex))
+			args = append(args, filter.OrganizerID)
+			argIndex++
+		}
 		if filter.Search != "" {
 			conditions = append(conditions, fmt.Sprintf("(name ILIKE $%d OR description ILIKE $%d)", argIndex, argIndex))
 			args = append(args, "%"+filter.Search+"%")

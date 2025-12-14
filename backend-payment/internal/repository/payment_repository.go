@@ -23,6 +23,9 @@ type PaymentRepository interface {
 	// Update updates an existing payment
 	Update(ctx context.Context, payment *domain.Payment) error
 
-	// GetByTransactionID retrieves a payment by transaction ID
-	GetByTransactionID(ctx context.Context, transactionID string) (*domain.Payment, error)
+	// GetByGatewayPaymentID retrieves a payment by gateway payment ID (e.g., Stripe PaymentIntent ID)
+	GetByGatewayPaymentID(ctx context.Context, gatewayPaymentID string) (*domain.Payment, error)
+
+	// GetByIdempotencyKey retrieves a payment by idempotency key
+	GetByIdempotencyKey(ctx context.Context, idempotencyKey string) (*domain.Payment, error)
 }

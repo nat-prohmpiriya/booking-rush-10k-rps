@@ -6,10 +6,10 @@ import "time"
 type CreateShowRequest struct {
 	EventID     string     `json:"-"` // Set from URL param
 	Name        string     `json:"name" binding:"max=255"`
-	ShowDate    string     `json:"show_date" binding:"required"` // Format: 2006-01-02
-	StartTime   string     `json:"start_time" binding:"required"` // Format: 15:04:05+07:00
-	EndTime     string     `json:"end_time"`                      // Format: 15:04:05+07:00
-	DoorsOpenAt string     `json:"doors_open_at"`                 // Format: 15:04:05+07:00
+	ShowDate    string     `json:"show_date" binding:"required"` // Format: YYYY-MM-DD (e.g., 2006-01-02)
+	StartTime   string     `json:"start_time" binding:"required"` // Format: ISO 8601 (e.g., 2006-01-02T15:04:05+07:00) or time-only (e.g., 15:04:05)
+	EndTime     string     `json:"end_time"`                      // Format: ISO 8601 or time-only
+	DoorsOpenAt string     `json:"doors_open_at"`                 // Format: ISO 8601 or time-only
 	SaleStartAt *time.Time `json:"sale_start_at"`
 	SaleEndAt   *time.Time `json:"sale_end_at"`
 }

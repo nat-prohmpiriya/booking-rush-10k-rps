@@ -156,13 +156,15 @@ export default function LoginPage() {
                     errors.password ? "border-destructive focus:border-destructive" : ""
                   } ${success.password ? "border-success focus:border-success" : ""}`}
                 />
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="icon"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 text-muted-foreground hover:text-foreground"
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
+                </Button>
               </div>
               {errors.password && <p className="text-sm text-destructive">{errors.password}</p>}
             </div>

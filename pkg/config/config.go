@@ -10,17 +10,25 @@ import (
 
 // Config holds all application configuration
 type Config struct {
-	App            AppConfig      `mapstructure:"app"`
-	Server         ServerConfig   `mapstructure:"server"`
-	AuthDatabase   DatabaseConfig `mapstructure:"auth_database"`   // Auth service database (required for auth-service)
-	TicketDatabase DatabaseConfig `mapstructure:"ticket_database"` // Ticket service database (required for ticket-service)
-	BookingDatabase DatabaseConfig `mapstructure:"booking_database"` // Booking service database
-	PaymentDatabase DatabaseConfig `mapstructure:"payment_database"` // Payment service database
-	Redis          RedisConfig    `mapstructure:"redis"`
-	Kafka          KafkaConfig    `mapstructure:"kafka"`
-	MongoDB        MongoDBConfig  `mapstructure:"mongodb"`
-	JWT            JWTConfig      `mapstructure:"jwt"`
-	OTel           OTelConfig     `mapstructure:"otel"`
+	App             AppConfig       `mapstructure:"app"`
+	Server          ServerConfig    `mapstructure:"server"`
+	AuthDatabase    DatabaseConfig  `mapstructure:"auth_database"`    // Auth service database (required for auth-service)
+	TicketDatabase  DatabaseConfig  `mapstructure:"ticket_database"`  // Ticket service database (required for ticket-service)
+	BookingDatabase DatabaseConfig  `mapstructure:"booking_database"` // Booking service database
+	PaymentDatabase DatabaseConfig  `mapstructure:"payment_database"` // Payment service database
+	Redis           RedisConfig     `mapstructure:"redis"`
+	Kafka           KafkaConfig     `mapstructure:"kafka"`
+	MongoDB         MongoDBConfig   `mapstructure:"mongodb"`
+	JWT             JWTConfig       `mapstructure:"jwt"`
+	OTel            OTelConfig      `mapstructure:"otel"`
+	Services        ServicesConfig  `mapstructure:"services"`
+}
+
+// ServicesConfig holds URLs of other microservices
+type ServicesConfig struct {
+	TicketServiceURL  string `mapstructure:"ticket_service_url"`
+	AuthServiceURL    string `mapstructure:"auth_service_url"`
+	PaymentServiceURL string `mapstructure:"payment_service_url"`
 }
 
 // AppConfig holds application-level settings

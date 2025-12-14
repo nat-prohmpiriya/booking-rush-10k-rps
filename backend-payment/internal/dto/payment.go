@@ -33,37 +33,47 @@ type RefundPaymentRequest struct {
 
 // PaymentResponse represents a payment response
 type PaymentResponse struct {
-	ID            string               `json:"id"`
-	BookingID     string               `json:"booking_id"`
-	UserID        string               `json:"user_id"`
-	Amount        float64              `json:"amount"`
-	Currency      string               `json:"currency"`
-	Status        domain.PaymentStatus `json:"status"`
-	Method        domain.PaymentMethod `json:"method"`
-	TransactionID string               `json:"transaction_id,omitempty"`
-	FailureReason string               `json:"failure_reason,omitempty"`
-	Metadata      map[string]string    `json:"metadata,omitempty"`
-	CreatedAt     time.Time            `json:"created_at"`
-	UpdatedAt     time.Time            `json:"updated_at"`
-	CompletedAt   *time.Time           `json:"completed_at,omitempty"`
+	ID                string               `json:"id"`
+	TenantID          string               `json:"tenant_id"`
+	BookingID         string               `json:"booking_id"`
+	UserID            string               `json:"user_id"`
+	Amount            float64              `json:"amount"`
+	Currency          string               `json:"currency"`
+	Status            domain.PaymentStatus `json:"status"`
+	Method            domain.PaymentMethod `json:"method,omitempty"`
+	Gateway           string               `json:"gateway,omitempty"`
+	GatewayPaymentID  string               `json:"gateway_payment_id,omitempty"`
+	CardLastFour      string               `json:"card_last_four,omitempty"`
+	CardBrand         string               `json:"card_brand,omitempty"`
+	ErrorCode         string               `json:"error_code,omitempty"`
+	ErrorMessage      string               `json:"error_message,omitempty"`
+	Metadata          map[string]string    `json:"metadata,omitempty"`
+	CreatedAt         time.Time            `json:"created_at"`
+	UpdatedAt         time.Time            `json:"updated_at"`
+	ProcessedAt       *time.Time           `json:"processed_at,omitempty"`
 }
 
 // FromPayment converts a domain Payment to PaymentResponse
 func FromPayment(p *domain.Payment) *PaymentResponse {
 	return &PaymentResponse{
-		ID:            p.ID,
-		BookingID:     p.BookingID,
-		UserID:        p.UserID,
-		Amount:        p.Amount,
-		Currency:      p.Currency,
-		Status:        p.Status,
-		Method:        p.Method,
-		TransactionID: p.TransactionID,
-		FailureReason: p.FailureReason,
-		Metadata:      p.Metadata,
-		CreatedAt:     p.CreatedAt,
-		UpdatedAt:     p.UpdatedAt,
-		CompletedAt:   p.CompletedAt,
+		ID:               p.ID,
+		TenantID:         p.TenantID,
+		BookingID:        p.BookingID,
+		UserID:           p.UserID,
+		Amount:           p.Amount,
+		Currency:         p.Currency,
+		Status:           p.Status,
+		Method:           p.Method,
+		Gateway:          p.Gateway,
+		GatewayPaymentID: p.GatewayPaymentID,
+		CardLastFour:     p.CardLastFour,
+		CardBrand:        p.CardBrand,
+		ErrorCode:        p.ErrorCode,
+		ErrorMessage:     p.ErrorMessage,
+		Metadata:         p.Metadata,
+		CreatedAt:        p.CreatedAt,
+		UpdatedAt:        p.UpdatedAt,
+		ProcessedAt:      p.ProcessedAt,
 	}
 }
 

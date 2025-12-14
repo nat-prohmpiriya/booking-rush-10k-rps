@@ -14,16 +14,10 @@ export function Hero() {
       {/* Content */}
       <div className="relative container mx-auto px-4 lg:px-8 h-full flex items-center">
         <div className="max-w-3xl space-y-6">
-          <div className="inline-block glass px-4 py-2 rounded-full">
-            <span className="text-primary text-sm font-medium">Premium Event Experiences</span>
-          </div>
-          <h1 className="text-4xl lg:text-7xl font-bold text-balance leading-tight">
-            Discover & Book
-            <span className="block bg-linear-to-r from-primary to-amber-400 bg-clip-text text-transparent">
-              Exclusive Events
-            </span>
+          <h1 className="text-4xl lg:text-7xl font-bold text-balance leading-tight text-primary uppercase">
+            Discover & Book Exclusive Events
           </h1>
-          <p className="text-lg lg:text-xl text-muted-foreground text-pretty max-w-2xl">
+          <p className="text-lg lg:text-xl text-primary text-pretty max-w-2xl uppercase font-bold">
             Experience the finest concerts, festivals, and shows. Book your tickets to unforgettable moments.
           </p>
           <div className="flex flex-col sm:flex-row gap-4">

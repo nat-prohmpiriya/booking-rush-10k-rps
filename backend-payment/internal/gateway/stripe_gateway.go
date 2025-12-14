@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/stripe/stripe-go/v76"
-	"github.com/stripe/stripe-go/v76/billingportal/session"
-	"github.com/stripe/stripe-go/v76/customer"
-	"github.com/stripe/stripe-go/v76/paymentintent"
-	"github.com/stripe/stripe-go/v76/paymentmethod"
-	"github.com/stripe/stripe-go/v76/refund"
+	"github.com/stripe/stripe-go/v82"
+	"github.com/stripe/stripe-go/v82/billingportal/session"
+	"github.com/stripe/stripe-go/v82/customer"
+	"github.com/stripe/stripe-go/v82/paymentintent"
+	"github.com/stripe/stripe-go/v82/paymentmethod"
+	"github.com/stripe/stripe-go/v82/refund"
 )
 
 // StripeGateway implements PaymentGateway using Stripe
@@ -174,14 +174,8 @@ func (g *StripeGateway) CreatePaymentIntent(ctx context.Context, req *PaymentInt
 	}
 
 	// Convert amount to smallest currency unit (satang for THB, cents for USD)
-	amountInSmallestUnit := int64(req.Amount)
-	if req.Currency == "THB" || req.Currency == "thb" {
-		// THB uses satang (1 THB = 100 satang), amount is already in satang
-		amountInSmallestUnit = int64(req.Amount)
-	} else {
-		// For other currencies like USD, convert to cents
-		amountInSmallestUnit = int64(req.Amount * 100)
-	}
+	// All currencies with 100 subunits need to multiply by 100
+	amountInSmallestUnit := int64(req.Amount * 100)
 
 	// Build payment intent params
 	params := &stripe.PaymentIntentParams{
@@ -235,7 +229,7 @@ func (g *StripeGateway) ConfirmPaymentIntent(ctx context.Context, paymentIntentI
 		PaymentIntentID: pi.ID,
 		ClientSecret:    pi.ClientSecret,
 		Status:          string(pi.Status),
-		Amount:          float64(pi.Amount),
+		Amount:          float64(pi.Amount) / 100, // Convert from smallest unit back to main currency
 		Currency:        string(pi.Currency),
 	}, nil
 }

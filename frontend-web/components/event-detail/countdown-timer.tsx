@@ -8,16 +8,17 @@ interface CountdownTimerProps {
   targetDate?: Date
   saleEndDate?: Date
   showDate?: Date
+  showStatus?: string // "scheduled" | "on_sale" | "sold_out" | "cancelled" | "completed"
 }
 
-export function CountdownTimer({ targetDate, saleEndDate, showDate }: CountdownTimerProps) {
+export function CountdownTimer({ targetDate, saleEndDate, showDate, showStatus }: CountdownTimerProps) {
   const [timeLeft, setTimeLeft] = useState({
     days: 0,
     hours: 0,
     minutes: 0,
     seconds: 0,
   })
-  const [saleStatus, setSaleStatus] = useState<"upcoming" | "open" | "ended" | "event_ended">("upcoming")
+  const [saleState, setSaleState] = useState<"upcoming" | "open" | "ended" | "event_ended" | "sold_out" | "cancelled">("upcoming")
 
   useEffect(() => {
     const calculateTime = () => {
@@ -29,14 +30,54 @@ export function CountdownTimer({ targetDate, saleEndDate, showDate }: CountdownT
         // Add 24 hours to show date to account for the full day
         const showEndOfDay = showDateTime + (24 * 60 * 60 * 1000)
         if (now > showEndOfDay) {
-          setSaleStatus("event_ended")
+          setSaleState("event_ended")
           return
         }
       }
 
-      // If no targetDate provided, check if event is still valid
+      // Priority: Use showStatus from backend if available
+      if (showStatus) {
+        switch (showStatus) {
+          case "on_sale":
+            setSaleState("open")
+            return
+          case "sold_out":
+            setSaleState("sold_out")
+            return
+          case "cancelled":
+            setSaleState("cancelled")
+            return
+          case "completed":
+            setSaleState("event_ended")
+            return
+          case "scheduled":
+            // Show is scheduled but not on sale yet
+            // If we have a targetDate, show countdown, otherwise show "Coming Soon"
+            if (targetDate) {
+              const saleStart = targetDate.getTime()
+              if (now >= saleStart) {
+                // Time has passed but backend still shows scheduled
+                setSaleState("upcoming")
+              } else {
+                setSaleState("upcoming")
+                const distance = saleStart - now
+                setTimeLeft({
+                  days: Math.floor(distance / (1000 * 60 * 60 * 24)),
+                  hours: Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
+                  minutes: Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60)),
+                  seconds: Math.floor((distance % (1000 * 60)) / 1000),
+                })
+              }
+            } else {
+              setSaleState("upcoming")
+            }
+            return
+        }
+      }
+
+      // Fallback: Use dates if no showStatus
       if (!targetDate) {
-        setSaleStatus("open") // Assume sale is open if no date specified
+        setSaleState("upcoming") // Default to upcoming if no info
         return
       }
 
@@ -45,18 +86,18 @@ export function CountdownTimer({ targetDate, saleEndDate, showDate }: CountdownT
 
       // Check if sale has ended
       if (saleEnd && now > saleEnd) {
-        setSaleStatus("ended")
+        setSaleState("ended")
         return
       }
 
       // Check if sale is open
       if (now >= saleStart) {
-        setSaleStatus("open")
+        setSaleState("open")
         return
       }
 
       // Sale is upcoming - calculate countdown
-      setSaleStatus("upcoming")
+      setSaleState("upcoming")
       const distance = saleStart - now
 
       setTimeLeft({
@@ -71,10 +112,10 @@ export function CountdownTimer({ targetDate, saleEndDate, showDate }: CountdownT
     const timer = setInterval(calculateTime, 1000)
 
     return () => clearInterval(timer)
-  }, [targetDate, saleEndDate, showDate])
+  }, [targetDate, saleEndDate, showDate, showStatus])
 
   // Event has ended (show date passed)
-  if (saleStatus === "event_ended") {
+  if (saleState === "event_ended") {
     return (
       <Card className="bg-zinc-500/10 border-zinc-500/30 p-6">
         <div className="flex items-center gap-4">
@@ -89,7 +130,7 @@ export function CountdownTimer({ targetDate, saleEndDate, showDate }: CountdownT
   }
 
   // Sale is open - show "Sale is Open" message
-  if (saleStatus === "open") {
+  if (saleState === "open") {
     return (
       <Card className="bg-green-500/10 border-green-500/30 p-6">
         <div className="flex items-center gap-4">
@@ -103,8 +144,38 @@ export function CountdownTimer({ targetDate, saleEndDate, showDate }: CountdownT
     )
   }
 
+  // Sold out
+  if (saleState === "sold_out") {
+    return (
+      <Card className="bg-orange-500/10 border-orange-500/30 p-6">
+        <div className="flex items-center gap-4">
+          <Clock className="w-6 h-6 text-orange-500" />
+          <div>
+            <h3 className="text-lg font-semibold text-orange-500">Sold Out</h3>
+            <p className="text-sm text-muted-foreground">All tickets have been sold</p>
+          </div>
+        </div>
+      </Card>
+    )
+  }
+
+  // Cancelled
+  if (saleState === "cancelled") {
+    return (
+      <Card className="bg-red-500/10 border-red-500/30 p-6">
+        <div className="flex items-center gap-4">
+          <Clock className="w-6 h-6 text-red-500" />
+          <div>
+            <h3 className="text-lg font-semibold text-red-500">Event Cancelled</h3>
+            <p className="text-sm text-muted-foreground">This event has been cancelled</p>
+          </div>
+        </div>
+      </Card>
+    )
+  }
+
   // Sale has ended
-  if (saleStatus === "ended") {
+  if (saleState === "ended") {
     return (
       <Card className="bg-red-500/10 border-red-500/30 p-6">
         <div className="flex items-center gap-4">
@@ -118,7 +189,23 @@ export function CountdownTimer({ targetDate, saleEndDate, showDate }: CountdownT
     )
   }
 
-  // Sale is upcoming - show countdown
+  // Sale is upcoming - show countdown or "Coming Soon"
+  const hasCountdown = timeLeft.days > 0 || timeLeft.hours > 0 || timeLeft.minutes > 0 || timeLeft.seconds > 0
+
+  if (!hasCountdown) {
+    return (
+      <Card className="bg-[#d4af37]/10 border-[#d4af37]/30 p-6">
+        <div className="flex items-center gap-4">
+          <Clock className="w-6 h-6 text-[#d4af37]" />
+          <div>
+            <h3 className="text-lg font-semibold text-[#d4af37]">Coming Soon</h3>
+            <p className="text-sm text-muted-foreground">Ticket sales will open soon</p>
+          </div>
+        </div>
+      </Card>
+    )
+  }
+
   return (
     <Card className="bg-[#d4af37]/10 border-[#d4af37]/30 p-6">
       <div className="flex items-center gap-4 mb-4">

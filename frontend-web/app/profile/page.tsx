@@ -236,9 +236,12 @@ export default function ProfilePage() {
                     <div className="h-28 w-28 rounded-full bg-linear-to-br from-primary to-amber-400 flex items-center justify-center text-3xl font-bold text-primary-foreground">
                       {user?.name ? getInitials(user.name) : "U"}
                     </div>
-                    <button className="absolute bottom-0 right-0 h-10 w-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg">
+                    <Button
+                      size="icon"
+                      className="absolute bottom-0 right-0 h-10 w-10 rounded-full bg-primary text-primary-foreground opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                    >
                       <Camera className="h-5 w-5" />
-                    </button>
+                    </Button>
                   </div>
 
                   {/* User Info */}
@@ -427,11 +430,12 @@ export default function ProfilePage() {
                     }
 
                     return (
-                      <button
+                      <Button
                         key={item.label}
+                        variant="ghost"
                         onClick={() => handleMenuItemClick(item)}
                         disabled={isLoading}
-                        className="flex items-center gap-4 p-4 hover:bg-primary/5 transition-colors group w-full text-left disabled:opacity-50"
+                        className="flex items-center gap-4 p-4 h-auto hover:bg-primary/5 transition-colors group w-full justify-start text-left disabled:opacity-50"
                       >
                         <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
                           {isLoading ? (
@@ -447,7 +451,7 @@ export default function ProfilePage() {
                           <p className="text-xs text-muted-foreground">{item.description}</p>
                         </div>
                         <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
-                      </button>
+                      </Button>
                     )
                   })}
                 </div>

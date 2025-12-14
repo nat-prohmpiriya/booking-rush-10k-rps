@@ -127,10 +127,30 @@ func (m *MockEventRepoForShow) AddEvent(event *domain.Event) {
 	m.events[event.ID] = event
 }
 
+// MockZoneSyncerForShow is a mock implementation of ZoneSyncer
+type MockZoneSyncerForShow struct{}
+
+func (m *MockZoneSyncerForShow) SyncByShowID(ctx context.Context, showID string) error {
+	return nil
+}
+
+func (m *MockZoneSyncerForShow) RemoveByShowID(ctx context.Context, showID string) error {
+	return nil
+}
+
+func (m *MockZoneSyncerForShow) SyncZone(ctx context.Context, zone *domain.ShowZone) error {
+	return nil
+}
+
+func (m *MockZoneSyncerForShow) RemoveZone(ctx context.Context, zoneID string) error {
+	return nil
+}
+
 func TestShowService_CreateShow(t *testing.T) {
 	mockShowRepo := NewMockShowRepository()
 	mockEventRepo := NewMockEventRepoForShow()
-	svc := NewShowService(mockShowRepo, mockEventRepo)
+	mockZoneSyncer := &MockZoneSyncerForShow{}
+	svc := NewShowService(mockShowRepo, mockEventRepo, mockZoneSyncer)
 
 	// Add test event
 	now := time.Now()
@@ -222,7 +242,8 @@ func TestShowService_CreateShow(t *testing.T) {
 func TestShowService_GetShowByID(t *testing.T) {
 	mockShowRepo := NewMockShowRepository()
 	mockEventRepo := NewMockEventRepoForShow()
-	svc := NewShowService(mockShowRepo, mockEventRepo)
+	mockZoneSyncer := &MockZoneSyncerForShow{}
+	svc := NewShowService(mockShowRepo, mockEventRepo, mockZoneSyncer)
 
 	// Add test show
 	now := time.Now()
@@ -277,7 +298,8 @@ func TestShowService_GetShowByID(t *testing.T) {
 func TestShowService_ListShowsByEvent(t *testing.T) {
 	mockShowRepo := NewMockShowRepository()
 	mockEventRepo := NewMockEventRepoForShow()
-	svc := NewShowService(mockShowRepo, mockEventRepo)
+	mockZoneSyncer := &MockZoneSyncerForShow{}
+	svc := NewShowService(mockShowRepo, mockEventRepo, mockZoneSyncer)
 
 	// Add test event
 	now := time.Now()
@@ -359,7 +381,8 @@ func TestShowService_ListShowsByEvent(t *testing.T) {
 func TestShowService_UpdateShow(t *testing.T) {
 	mockShowRepo := NewMockShowRepository()
 	mockEventRepo := NewMockEventRepoForShow()
-	svc := NewShowService(mockShowRepo, mockEventRepo)
+	mockZoneSyncer := &MockZoneSyncerForShow{}
+	svc := NewShowService(mockShowRepo, mockEventRepo, mockZoneSyncer)
 
 	// Add test show
 	now := time.Now()
@@ -421,7 +444,8 @@ func TestShowService_UpdateShow(t *testing.T) {
 func TestShowService_DeleteShow(t *testing.T) {
 	mockShowRepo := NewMockShowRepository()
 	mockEventRepo := NewMockEventRepoForShow()
-	svc := NewShowService(mockShowRepo, mockEventRepo)
+	mockZoneSyncer := &MockZoneSyncerForShow{}
+	svc := NewShowService(mockShowRepo, mockEventRepo, mockZoneSyncer)
 
 	// Add test show
 	now := time.Now()

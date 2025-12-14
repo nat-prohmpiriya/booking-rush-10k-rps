@@ -20,13 +20,15 @@ var (
 type showZoneService struct {
 	showZoneRepo repository.ShowZoneRepository
 	showRepo     repository.ShowRepository
+	zoneSyncer   ZoneSyncer
 }
 
 // NewShowZoneService creates a new ShowZoneService
-func NewShowZoneService(showZoneRepo repository.ShowZoneRepository, showRepo repository.ShowRepository) ShowZoneService {
+func NewShowZoneService(showZoneRepo repository.ShowZoneRepository, showRepo repository.ShowRepository, zoneSyncer ZoneSyncer) ShowZoneService {
 	return &showZoneService{
 		showZoneRepo: showZoneRepo,
 		showRepo:     showRepo,
+		zoneSyncer:   zoneSyncer,
 	}
 }
 
@@ -57,12 +59,18 @@ func (s *showZoneService) CreateShowZone(ctx context.Context, req *dto.CreateSho
 		AvailableSeats: req.TotalSeats, // Initially all seats are available
 		Description:    req.Description,
 		SortOrder:      req.SortOrder,
+		IsActive:       true, // Default to active
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}
 
 	if err := s.showZoneRepo.Create(ctx, zone); err != nil {
 		return nil, err
+	}
+
+	// Only sync to Redis if show is on_sale
+	if show.Status == domain.ShowStatusOnSale && zone.IsActive {
+		_ = s.zoneSyncer.SyncZone(ctx, zone)
 	}
 
 	return zone, nil
@@ -93,7 +101,7 @@ func (s *showZoneService) ListZonesByShow(ctx context.Context, showID string, fi
 		return nil, 0, ErrShowNotFound
 	}
 
-	return s.showZoneRepo.GetByShowID(ctx, showID, filter.Limit, filter.Offset)
+	return s.showZoneRepo.GetByShowID(ctx, showID, filter.IsActive, filter.Limit, filter.Offset)
 }
 
 // UpdateShowZone updates a show zone
@@ -134,9 +142,23 @@ func (s *showZoneService) UpdateShowZone(ctx context.Context, id string, req *dt
 	if req.SortOrder != nil {
 		zone.SortOrder = *req.SortOrder
 	}
+	if req.IsActive != nil {
+		zone.IsActive = *req.IsActive
+	}
 
 	if err := s.showZoneRepo.Update(ctx, zone); err != nil {
 		return nil, err
+	}
+
+	// Only sync to Redis if show is on_sale
+	show, err := s.showRepo.GetByID(ctx, zone.ShowID)
+	if err == nil && show != nil && show.Status == domain.ShowStatusOnSale {
+		if zone.IsActive {
+			_ = s.zoneSyncer.SyncZone(ctx, zone)
+		} else {
+			// Remove from Redis if zone is deactivated
+			_ = s.zoneSyncer.RemoveZone(ctx, zone.ID)
+		}
 	}
 
 	return zone, nil
@@ -154,4 +176,9 @@ func (s *showZoneService) DeleteShowZone(ctx context.Context, id string) error {
 	}
 
 	return s.showZoneRepo.Delete(ctx, id)
+}
+
+// ListActiveZones lists all active zones for inventory sync
+func (s *showZoneService) ListActiveZones(ctx context.Context) ([]*domain.ShowZone, error) {
+	return s.showZoneRepo.ListActive(ctx)
 }

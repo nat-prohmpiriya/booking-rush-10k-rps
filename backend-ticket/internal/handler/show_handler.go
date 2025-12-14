@@ -3,6 +3,7 @@ package handler
 import (
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/prohmpiriya/booking-rush-10k-rps/backend-ticket/internal/domain"
@@ -93,7 +94,12 @@ func (h *ShowHandler) Create(c *gin.Context) {
 			c.JSON(http.StatusNotFound, response.NotFound("Event not found"))
 			return
 		}
-		c.JSON(http.StatusInternalServerError, response.InternalError("Failed to create show"))
+		// Check for validation errors (invalid format, etc.)
+		if isValidationError(err) {
+			c.JSON(http.StatusBadRequest, response.BadRequest(err.Error()))
+			return
+		}
+		c.JSON(http.StatusInternalServerError, response.InternalError("Failed to create show: "+err.Error()))
 		return
 	}
 
@@ -147,7 +153,12 @@ func (h *ShowHandler) Update(c *gin.Context) {
 			c.JSON(http.StatusNotFound, response.NotFound("Show not found"))
 			return
 		}
-		c.JSON(http.StatusInternalServerError, response.InternalError("Failed to update show"))
+		// Check for validation errors (invalid format, etc.)
+		if isValidationError(err) {
+			c.JSON(http.StatusBadRequest, response.BadRequest(err.Error()))
+			return
+		}
+		c.JSON(http.StatusInternalServerError, response.InternalError("Failed to update show: "+err.Error()))
 		return
 	}
 
@@ -173,6 +184,14 @@ func (h *ShowHandler) Delete(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, response.Success(map[string]string{"message": "Show deleted successfully"}))
+}
+
+// isValidationError checks if error is a validation error (should return 400 BadRequest)
+func isValidationError(err error) bool {
+	msg := err.Error()
+	return strings.HasPrefix(msg, "invalid ") ||
+		strings.Contains(msg, "is required") ||
+		strings.Contains(msg, "format")
 }
 
 // toShowResponse converts a domain show to response DTO

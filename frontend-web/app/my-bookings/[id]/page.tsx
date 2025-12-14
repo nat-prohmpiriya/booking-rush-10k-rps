@@ -7,6 +7,16 @@ import { Header } from "@/components/header"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useAuth } from "@/contexts/auth-context"
 import { bookingApi } from "@/lib/api/booking"
@@ -127,6 +137,8 @@ export default function BookingDetailPage() {
   const [bookingDetail, setBookingDetail] = useState<BookingDetail | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isCancelling, setIsCancelling] = useState(false)
+  const [showCancelDialog, setShowCancelDialog] = useState(false)
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -183,6 +195,28 @@ export default function BookingDetailPage() {
       fetchBookingDetail()
     }
   }, [bookingId, isAuthenticated, authLoading, router])
+
+  const handleCancelBooking = async () => {
+    if (!bookingId) return
+
+    setIsCancelling(true)
+    try {
+      await bookingApi.releaseBooking(bookingId)
+      // Update local state to reflect cancellation
+      if (bookingDetail) {
+        setBookingDetail({
+          ...bookingDetail,
+          booking: { ...bookingDetail.booking, status: "cancelled" }
+        })
+      }
+      setShowCancelDialog(false)
+    } catch (err) {
+      console.error("Failed to cancel booking:", err)
+      setError("Failed to cancel booking. Please try again.")
+    } finally {
+      setIsCancelling(false)
+    }
+  }
 
   if (authLoading || isLoading) {
     return (
@@ -493,15 +527,56 @@ export default function BookingDetailPage() {
                     Complete Payment
                   </Button>
                 </Link>
-                <Button variant="outline" className="flex-1 border-red-500/50 text-red-400 hover:bg-red-500/10">
+                <Button
+                  variant="outline"
+                  className="flex-1 border-red-500/50 text-red-400 hover:bg-red-500/10"
+                  onClick={() => setShowCancelDialog(true)}
+                >
                   <XCircle className="w-4 h-4 mr-2" />
                   Cancel Booking
                 </Button>
               </>
             )}
 
-            {isCancelled && event?.slug && (
-              <Link href={`/events/${event.slug}`} className="flex-1">
+            {/* Cancel Confirmation Dialog */}
+            <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+              <AlertDialogContent className="bg-zinc-900 border-red-800">
+                <AlertDialogHeader className="text-center">
+                  <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4">
+                    <AlertCircle className="w-8 h-8 text-red-500" />
+                  </div>
+                  <AlertDialogTitle className="text-xl font-bold">Cancel Booking?</AlertDialogTitle>
+                  <AlertDialogDescription className="text-muted-foreground">
+                    Are you sure you want to cancel this booking? Your reserved seats will be released and this action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter className="flex gap-3 sm:justify-center">
+                  <AlertDialogCancel
+                    disabled={isCancelling}
+                    className="flex-1"
+                  >
+                    Keep Booking
+                  </AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleCancelBooking}
+                    disabled={isCancelling}
+                    className="flex-1 bg-red-600 hover:bg-red-700"
+                  >
+                    {isCancelling ? (
+                      <>
+                        <span className="animate-spin mr-2">⏳</span>
+                        Cancelling...
+                      </>
+                    ) : (
+                      "Yes, Cancel"
+                    )}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+
+            {isCancelled && event?.id && (
+              <Link href={`/events/${event.id}`} className="flex-1">
                 <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
                   <Ticket className="w-4 h-4 mr-2" />
                   Book Again

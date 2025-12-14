@@ -44,6 +44,7 @@ type bookingService struct {
 	bookingRepo     repository.BookingRepository
 	reservationRepo repository.ReservationRepository
 	eventPublisher  EventPublisher
+	zoneSyncer      ZoneSyncer
 	reservationTTL  time.Duration
 	maxPerUser      int
 	defaultCurrency string
@@ -61,6 +62,7 @@ func NewBookingService(
 	bookingRepo repository.BookingRepository,
 	reservationRepo repository.ReservationRepository,
 	eventPublisher EventPublisher,
+	zoneSyncer ZoneSyncer,
 	cfg *BookingServiceConfig,
 ) BookingService {
 	ttl := 10 * time.Minute
@@ -85,6 +87,7 @@ func NewBookingService(
 		bookingRepo:     bookingRepo,
 		reservationRepo: reservationRepo,
 		eventPublisher:  eventPublisher,
+		zoneSyncer:      zoneSyncer,
 		reservationTTL:  ttl,
 		maxPerUser:      maxPerUser,
 		defaultCurrency: currency,
@@ -171,6 +174,30 @@ func (s *bookingService) ReserveSeats(ctx context.Context, userID string, req *d
 		case "USER_LIMIT_EXCEEDED":
 			return nil, domain.ErrMaxTicketsExceeded
 		case "ZONE_NOT_FOUND":
+			// Auto-sync zone from ticket service and retry once
+			if s.zoneSyncer != nil {
+				if syncErr := s.zoneSyncer.SyncZone(ctx, req.ZoneID); syncErr == nil {
+					// Retry the reservation after sync
+					retryResult, retryErr := s.reservationRepo.ReserveSeats(ctx, params)
+					if retryErr != nil {
+						return nil, retryErr
+					}
+					if retryResult.Success {
+						result = retryResult
+						// Continue to create booking record below
+						goto createBooking
+					}
+					// Retry failed, return the error
+					switch retryResult.ErrorCode {
+					case "INSUFFICIENT_STOCK":
+						return nil, domain.ErrInsufficientSeats
+					case "USER_LIMIT_EXCEEDED":
+						return nil, domain.ErrMaxTicketsExceeded
+					default:
+						return nil, domain.ErrZoneNotFound
+					}
+				}
+			}
 			return nil, domain.ErrZoneNotFound
 		case "INVALID_QUANTITY":
 			return nil, domain.ErrInvalidQuantity
@@ -178,6 +205,8 @@ func (s *bookingService) ReserveSeats(ctx context.Context, userID string, req *d
 			return nil, domain.ErrInvalidBookingStatus
 		}
 	}
+
+createBooking:
 
 	// Create booking record in PostgreSQL
 	now := time.Now()

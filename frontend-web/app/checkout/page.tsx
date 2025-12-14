@@ -1,14 +1,14 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, Suspense } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { Clock, Shield, Lock, Calendar, MapPin, Ticket, AlertTriangle, CreditCard } from "lucide-react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { bookingApi, paymentApi } from "@/lib/api/booking"
 import { paymentApi as paymentMethodsApi, type PaymentMethod } from "@/lib/api/payment"
-import { eventsApi } from "@/lib/api/events"
+import { eventsApi, zonesApi } from "@/lib/api/events"
 import type { EventResponse, ShowResponse, ShowZoneResponse, ReserveSeatsResponse, PaymentIntentResponse } from "@/lib/api/types"
 import { ApiRequestError } from "@/lib/api/client"
 import { getStripe, isStripeConfigured } from "@/lib/stripe"
@@ -26,8 +26,33 @@ interface QueueData {
   queuePassExpiresAt: string
 }
 
+// Wrapper component to handle Suspense for useSearchParams
 export default function CheckoutPage() {
+  return (
+    <Suspense fallback={<CheckoutLoadingFallback />}>
+      <CheckoutContent />
+    </Suspense>
+  )
+}
+
+function CheckoutLoadingFallback() {
+  return (
+    <div className="min-h-screen bg-black-gradient pattern-dots flex items-center justify-center">
+      <div className="text-center">
+        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+        <p className="text-muted-foreground">Loading checkout...</p>
+      </div>
+    </div>
+  )
+}
+
+function CheckoutContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const bookingIdParam = searchParams.get("booking_id")
+
+  // Mode: "queue" (normal flow) or "direct" (from booking detail)
+  const [mode, setMode] = useState<"queue" | "direct" | null>(null)
 
   // Queue data from sessionStorage
   const [queueData, setQueueData] = useState<QueueData | null>(null)
@@ -80,10 +105,73 @@ export default function CheckoutPage() {
     fetchSavedPaymentMethods()
   }, [])
 
-  // Load queue data from sessionStorage
+  // Load data - either from booking_id param (direct) or sessionStorage (queue)
   useEffect(() => {
     if (typeof window === "undefined") return
 
+    // Direct mode: Load existing booking
+    if (bookingIdParam) {
+      setMode("direct")
+      const loadExistingBooking = async () => {
+        try {
+          const booking = await bookingApi.getBooking(bookingIdParam)
+
+          // Check if booking is still pending/reserved
+          if (booking.status !== "reserved" && booking.status !== "pending") {
+            setError(`This booking is ${booking.status}. Cannot complete payment.`)
+            setCheckoutState("error")
+            return
+          }
+
+          // Load event details
+          const eventData = await eventsApi.getEvent(booking.event_id)
+          setEvent(eventData)
+
+          // Load zone details
+          try {
+            const zoneData = await zonesApi.getById(booking.zone_id)
+            setZones([zoneData])
+          } catch {
+            console.warn("Could not load zone details")
+          }
+
+          // Set reservation from existing booking
+          setReservation({
+            booking_id: booking.id,
+            status: booking.status,
+            expires_at: booking.expires_at,
+            total_price: booking.total_price,
+          })
+
+          // Calculate time left from booking expiry
+          if (booking.expires_at) {
+            const expiresAt = new Date(booking.expires_at).getTime()
+            const now = Date.now()
+            const remaining = Math.max(0, Math.floor((expiresAt - now) / 1000))
+            setTimeLeft(remaining)
+
+            if (remaining <= 0) {
+              setError("This booking has expired.")
+              setCheckoutState("error")
+              return
+            }
+          }
+
+          // Skip straight to creating payment intent
+          setCheckoutState("creating_intent")
+        } catch (err) {
+          console.error("Failed to load booking:", err)
+          setError("Failed to load booking details. Please try again.")
+          setCheckoutState("error")
+        }
+      }
+
+      loadExistingBooking()
+      return
+    }
+
+    // Queue mode: Load from sessionStorage
+    setMode("queue")
     const eventId = sessionStorage.getItem("queue_event_id")
     const showId = sessionStorage.getItem("queue_show_id")
     const ticketsStr = sessionStorage.getItem("queue_tickets")
@@ -116,7 +204,7 @@ export default function CheckoutPage() {
       const remaining = Math.max(0, Math.floor((expiresAt - now) / 1000))
       setTimeLeft(remaining)
     }
-  }, [])
+  }, [bookingIdParam])
 
   // Fetch event details
   useEffect(() => {
@@ -302,6 +390,32 @@ export default function CheckoutPage() {
 
   // Calculate totals
   const getOrderSummary = useCallback(() => {
+    // Direct mode: use reservation data
+    if (mode === "direct" && reservation) {
+      const subtotal = reservation.total_price
+      const serviceFee = 0 // No service fee - platform absorbs payment processing costs
+      const total = subtotal
+
+      // Try to get zone info for display
+      const zone = zones.length > 0 ? zones[0] : null
+      const items = zone ? [{
+        zoneId: zone.id,
+        zoneName: zone.name || "Zone",
+        quantity: Math.round(subtotal / (zone.price || subtotal)), // Calculate quantity from price
+        price: zone.price || subtotal,
+        subtotal: subtotal,
+      }] : [{
+        zoneId: "unknown",
+        zoneName: "Ticket",
+        quantity: 1,
+        price: subtotal,
+        subtotal: subtotal,
+      }]
+
+      return { items, subtotal, serviceFee, total }
+    }
+
+    // Queue mode: calculate from ticket selection
     if (!queueData || !zones.length) {
       return { items: [], subtotal: 0, serviceFee: 0, total: 0 }
     }
@@ -318,16 +432,18 @@ export default function CheckoutPage() {
     })
 
     const subtotal = items.reduce((sum, item) => sum + item.subtotal, 0)
-    const serviceFee = Math.round(subtotal * 0.05) // 5% service fee
-    const total = subtotal + serviceFee
+    const serviceFee = 0 // No service fee - platform absorbs payment processing costs
+    const total = subtotal
 
     return { items, subtotal, serviceFee, total }
-  }, [queueData, zones])
+  }, [mode, reservation, queueData, zones])
 
   const orderSummary = getOrderSummary()
 
   // Handle successful Stripe payment
   const handlePaymentSuccess = async (paymentIntentId: string) => {
+    // Guard against duplicate calls
+    if (checkoutState === "processing" || checkoutState === "success") return
     if (!reservation?.booking_id || !paymentIntent?.payment_id) return
 
     setCheckoutState("processing")
@@ -400,18 +516,109 @@ export default function CheckoutPage() {
 
   // Error state
   if (checkoutState === "error") {
+    const isMaxTicketsError = error?.toLowerCase().includes("maximum tickets")
+
     return (
       <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center p-4">
-        <Card className="bg-[#1a1a1a] border-red-800 p-8 max-w-md text-center">
-          <div className="w-16 h-16 rounded-full border-2 border-red-500 flex items-center justify-center mx-auto mb-4">
-            <AlertTriangle className="w-8 h-8 text-red-500" />
-          </div>
-          <h1 className="text-2xl font-bold text-white mb-2">Checkout Failed</h1>
-          <p className="text-gray-400 mb-6">{error}</p>
-          <Button onClick={() => router.push("/")} className="bg-[#d4af37] hover:bg-[#d4af37]/90 text-black">
-            Back to Events
-          </Button>
-        </Card>
+        {/* Background decorations */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-red-500/5 rounded-full blur-3xl" />
+          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-orange-500/5 rounded-full blur-3xl" />
+        </div>
+
+        <div className="relative z-10 w-full max-w-lg">
+          {/* Main Card */}
+          <Card className="bg-gradient-to-b from-[#1a1a1a] to-[#141414] border border-red-900/30 overflow-hidden">
+            {/* Top accent line */}
+            <div className="h-1 bg-gradient-to-r from-red-600 via-orange-500 to-red-600" />
+
+            <div className="p-8 md:p-10">
+              {/* Icon */}
+              <div className="relative mx-auto mb-6 w-20 h-20">
+                <div className="absolute inset-0 bg-red-500/30 rounded-full blur-xl animate-pulse" />
+                <div className="relative w-20 h-20 rounded-full bg-gradient-to-br from-red-700 to-red-800 border border-red-400/50 flex items-center justify-center">
+                  <AlertTriangle className="w-9 h-9 text-white" />
+                </div>
+              </div>
+
+              {/* Title */}
+              <h1 className="text-2xl md:text-3xl font-bold text-white text-center mb-3">
+                Checkout Failed
+              </h1>
+
+              {/* Error message */}
+              <div className="bg-red-950/30 border border-red-900/30 rounded-xl p-4 mb-6">
+                <p className="text-red-300 text-center text-sm md:text-base">
+                  {error}
+                </p>
+              </div>
+
+              {/* Helpful tips based on error type */}
+              {isMaxTicketsError && (
+                <div className="bg-[#1f1f1f] rounded-xl p-4 mb-6 border border-gray-800">
+                  <p className="text-gray-400 text-sm mb-3 flex items-center gap-2">
+                    <span className="text-[#d4af37]">💡</span>
+                    <span className="font-medium text-gray-300">What can you do?</span>
+                  </p>
+                  <ul className="text-sm text-gray-400 space-y-2">
+                    <li className="flex items-start gap-2">
+                      <span className="text-gray-600 mt-0.5">•</span>
+                      <span>Check your existing bookings in your profile</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-gray-600 mt-0.5">•</span>
+                      <span>Cancel unused reservations to free up your limit</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-gray-600 mt-0.5">•</span>
+                      <span>Try booking for a different event</span>
+                    </li>
+                  </ul>
+                </div>
+              )}
+
+              {/* Action buttons */}
+              <div className="space-y-3">
+                <Button
+                  onClick={() => router.push("/")}
+                  className="w-full py-6 text-base font-semibold bg-gradient-to-r from-[#d4af37] to-[#c9a030] hover:from-[#e5c048] hover:to-[#d4af37] text-black shadow-lg shadow-[#d4af37]/20 transition-all duration-300"
+                >
+                  Browse Other Events
+                </Button>
+
+                {isMaxTicketsError && (
+                  <Button
+                    variant="outline"
+                    onClick={() => router.push("/profile/bookings")}
+                    className="w-full py-5 text-base border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white"
+                  >
+                    View My Bookings
+                  </Button>
+                )}
+
+                <Button
+                  variant="ghost"
+                  onClick={() => router.back()}
+                  className="w-full text-sm text-gray-500 hover:text-gray-300 py-2"
+                >
+                  ← Go back
+                </Button>
+              </div>
+            </div>
+
+            {/* Bottom decoration */}
+            <div className="px-8 pb-6">
+              <div className="border-t border-gray-800 pt-4">
+                <p className="text-xs text-gray-600 text-center">
+                  Need help?{" "}
+                  <a href="/support" className="text-[#d4af37] hover:underline">
+                    Contact Support
+                  </a>
+                </p>
+              </div>
+            </div>
+          </Card>
+        </div>
       </div>
     )
   }
@@ -548,11 +755,6 @@ export default function CheckoutPage() {
                       <span>฿{item.subtotal.toLocaleString()}</span>
                     </div>
                   ))}
-                  <div className="flex justify-between text-sm text-gray-300">
-                    <span>Service Fee (5%)</span>
-                    <span>฿{orderSummary.serviceFee.toLocaleString()}</span>
-                  </div>
-
                   <Separator className="bg-gray-700" />
 
                   <div className="flex justify-between text-lg font-bold text-white">
@@ -587,11 +789,12 @@ export default function CheckoutPage() {
                   <div className="mb-6 space-y-3">
                     <p className="text-sm font-medium text-gray-300">Saved Cards</p>
                     {savedPaymentMethods.map((pm) => (
-                      <button
+                      <Button
                         key={pm.id}
                         type="button"
+                        variant="outline"
                         onClick={() => setSelectedPaymentMethod(pm.id)}
-                        className={`w-full flex items-center gap-3 p-4 rounded-lg border transition-colors ${
+                        className={`w-full h-auto flex items-center gap-3 p-4 transition-colors ${
                           selectedPaymentMethod === pm.id
                             ? "border-[#d4af37] bg-[#d4af37]/10"
                             : "border-gray-700 bg-black/30 hover:border-gray-600"
@@ -617,14 +820,15 @@ export default function CheckoutPage() {
                         <span className="text-sm text-gray-500">
                           {pm.exp_month.toString().padStart(2, "0")}/{pm.exp_year.toString().slice(-2)}
                         </span>
-                      </button>
+                      </Button>
                     ))}
 
                     {/* Use new card option */}
-                    <button
+                    <Button
                       type="button"
+                      variant="outline"
                       onClick={() => setSelectedPaymentMethod(null)}
-                      className={`w-full flex items-center gap-3 p-4 rounded-lg border transition-colors ${
+                      className={`w-full h-auto flex items-center gap-3 p-4 transition-colors ${
                         selectedPaymentMethod === null
                           ? "border-[#d4af37] bg-[#d4af37]/10"
                           : "border-gray-700 bg-black/30 hover:border-gray-600"
@@ -639,7 +843,7 @@ export default function CheckoutPage() {
                       </div>
                       <CreditCard className="h-5 w-5 text-gray-400" />
                       <span className="text-white">Use a new card</span>
-                    </button>
+                    </Button>
                   </div>
                 )}
 

@@ -19,6 +19,7 @@ import (
 	"github.com/prohmpiriya/booking-rush-10k-rps/backend-payment/internal/service"
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/config"
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/database"
+	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/kafka"
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/logger"
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/middleware"
 	pkgredis "github.com/prohmpiriya/booking-rush-10k-rps/pkg/redis"
@@ -77,7 +78,7 @@ func main() {
 		Password:        cfg.PaymentDatabase.Password,
 		Database:        cfg.PaymentDatabase.DBName,
 		SSLMode:         cfg.PaymentDatabase.SSLMode,
-		MaxConns:        10,               // Optimized: async processing via Kafka
+		MaxConns:        10, // Optimized: async processing via Kafka
 		MinConns:        2,
 		MaxConnLifetime: 30 * time.Minute,
 		MaxConnIdleTime: 5 * time.Minute,
@@ -173,12 +174,27 @@ func main() {
 		authServiceURL = "http://localhost:8081"
 	}
 
+	// Initialize Kafka producer for event publishing
+	var kafkaProducer *kafka.Producer
+	kafkaProducerCfg := &kafka.ProducerConfig{
+		Brokers:  cfg.Kafka.Brokers,
+		ClientID: "payment-service-producer",
+	}
+	kafkaProducer, err = kafka.NewProducer(ctx, kafkaProducerCfg)
+	if err != nil {
+		appLog.Warn(fmt.Sprintf("Kafka producer connection failed: %v", err))
+	} else {
+		defer kafkaProducer.Close()
+		appLog.Info(fmt.Sprintf("Kafka producer connected (brokers: %v)", cfg.Kafka.Brokers))
+	}
+
 	// Build dependency injection container
 	container := di.NewContainer(&di.ContainerConfig{
 		DB:                  db,
 		Redis:               redisClient,
 		PaymentRepo:         paymentRepo,
 		PaymentGateway:      paymentGateway,
+		KafkaProducer:       kafkaProducer,
 		StripeWebhookSecret: stripeWebhookSecret,
 		AuthServiceURL:      authServiceURL,
 		ServiceConfig: &service.PaymentServiceConfig{

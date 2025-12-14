@@ -15,7 +15,7 @@ interface EventCardProps {
 export function EventCard({ id, title, venue, date, price, image }: EventCardProps) {
   return (
     <Link href={`/events/${id}`} className="block">
-      <Card className="group overflow-hidden glass border-border/50 hover:border-primary/50 transition-all duration-300 cursor-pointer">
+      <Card className="group overflow-hidden border-0 transition-all duration-300 cursor-pointer" style={{ background: 'linear-gradient(to top right, #0a0a0a 0%, #1a1a1a 50%, #2a2a2a 100%)' }}>
         <div className="relative h-48 lg:h-56 overflow-hidden">
           <img
             src={image || "/placeholder.svg"}
@@ -31,22 +31,22 @@ export function EventCard({ id, title, venue, date, price, image }: EventCardPro
         </div>
         <CardContent className="p-5 space-y-4">
           <div className="space-y-2">
-            <h3 className="text-xl font-bold text-foreground text-balance line-clamp-2 group-hover:text-primary transition-colors">
+            <h3 className="text-xl font-bold text-primary text-balance line-clamp-2">
               {title}
             </h3>
-            <div className="flex items-center gap-2 text-muted-foreground text-sm">
+            <div className="flex items-center gap-2 text-primary text-sm">
               <MapPin className="h-4 w-4" />
               <span className="line-clamp-1">{venue}</span>
             </div>
           </div>
-          <div className="flex items-center justify-between pt-2 border-t border-border/50">
+          <div className="flex items-center justify-between pt-2 border-t border-primary/30">
             <div>
-              <p className="text-xs text-muted-foreground">From</p>
-              <p className="text-2xl font-bold bg-linear-to-r from-primary to-amber-400 bg-clip-text text-transparent">
+              <p className="text-xs text-primary uppercase">From</p>
+              <p className="text-2xl font-bold text-primary">
                 ฿{price.toLocaleString()}
               </p>
             </div>
-            <Button className="bg-linear-to-r from-primary to-amber-400 hover:from-amber-400 hover:to-primary text-primary-foreground font-semibold">
+            <Button className="bg-primary hover:bg-amber-400 text-black font-semibold uppercase">
               Book Now
             </Button>
           </div>

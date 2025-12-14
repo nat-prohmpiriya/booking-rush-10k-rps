@@ -36,7 +36,7 @@ export const bookingApi = {
 
   async releaseBooking(bookingId: string): Promise<{ booking_id: string; status: string; message: string }> {
     const idempotencyKey = `release-${bookingId}-${Date.now()}`
-    return apiClient.post(`/bookings/${bookingId}/release`, {}, {
+    return apiClient.delete(`/bookings/${bookingId}`, {
       headers: { "X-Idempotency-Key": idempotencyKey }
     })
   },

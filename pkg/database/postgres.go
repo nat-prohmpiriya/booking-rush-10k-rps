@@ -34,12 +34,13 @@ type PostgresConfig struct {
 }
 
 // DefaultPostgresConfig returns default configuration
+// Note: Password must be provided via environment variable
 func DefaultPostgresConfig() *PostgresConfig {
 	return &PostgresConfig{
 		Host:            "localhost",
 		Port:            5432,
 		User:            "postgres",
-		Password:        "postgres",
+		Password:        "", // Must be provided via environment variable
 		Database:        "booking_rush",
 		SSLMode:         "disable",
 		MaxConns:        25,

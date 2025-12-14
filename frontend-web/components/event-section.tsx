@@ -33,16 +33,9 @@ export function EventSection({
   return (
     <section className="space-y-8">
       <div className="space-y-4">
-        {badge && (
-          <div className="inline-block glass px-4 py-2 rounded-full">
-            <span className={`text-sm font-medium ${badgeColors[badgeVariant]}`}>
-              {badge}
-            </span>
-          </div>
-        )}
-        <h2 className="text-2xl lg:text-4xl font-bold text-balance">{title}</h2>
+        <h2 className="text-2xl lg:text-4xl font-bold text-balance text-primary uppercase">{title}</h2>
         {subtitle && (
-          <p className="text-muted-foreground max-w-2xl text-pretty">
+          <p className="text-primary max-w-2xl text-pretty font-semibold">
             {subtitle}
           </p>
         )}

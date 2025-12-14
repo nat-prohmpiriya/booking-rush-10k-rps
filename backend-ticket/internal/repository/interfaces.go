@@ -30,11 +30,12 @@ type EventRepository interface {
 
 // EventFilter contains filter options for listing events
 type EventFilter struct {
-	Status     string
-	TenantID   string
-	CategoryID string
-	City       string
-	Search     string
+	Status      string
+	TenantID    string
+	OrganizerID string
+	CategoryID  string
+	City        string
+	Search      string
 }
 
 // VenueRepository defines the interface for venue data access
@@ -121,12 +122,14 @@ type ShowZoneRepository interface {
 	Create(ctx context.Context, zone *domain.ShowZone) error
 	// GetByID retrieves a show zone by ID
 	GetByID(ctx context.Context, id string) (*domain.ShowZone, error)
-	// GetByShowID retrieves all zones for a show with pagination
-	GetByShowID(ctx context.Context, showID string, limit, offset int) ([]*domain.ShowZone, int, error)
+	// GetByShowID retrieves all zones for a show with pagination and optional is_active filter
+	GetByShowID(ctx context.Context, showID string, isActive *bool, limit, offset int) ([]*domain.ShowZone, int, error)
 	// Update updates a show zone
 	Update(ctx context.Context, zone *domain.ShowZone) error
 	// Delete soft deletes a show zone by ID
 	Delete(ctx context.Context, id string) error
 	// UpdateAvailableSeats updates the available seats count
 	UpdateAvailableSeats(ctx context.Context, id string, availableSeats int) error
+	// ListActive retrieves all active zones (for inventory sync)
+	ListActive(ctx context.Context) ([]*domain.ShowZone, error)
 }

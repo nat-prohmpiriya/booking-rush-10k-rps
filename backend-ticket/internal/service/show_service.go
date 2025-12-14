@@ -18,16 +18,38 @@ var (
 
 // showService implements the ShowService interface
 type showService struct {
-	showRepo  repository.ShowRepository
-	eventRepo repository.EventRepository
+	showRepo   repository.ShowRepository
+	eventRepo  repository.EventRepository
+	zoneSyncer ZoneSyncer
 }
 
 // NewShowService creates a new ShowService
-func NewShowService(showRepo repository.ShowRepository, eventRepo repository.EventRepository) ShowService {
+func NewShowService(showRepo repository.ShowRepository, eventRepo repository.EventRepository, zoneSyncer ZoneSyncer) ShowService {
 	return &showService{
-		showRepo:  showRepo,
-		eventRepo: eventRepo,
+		showRepo:   showRepo,
+		eventRepo:  eventRepo,
+		zoneSyncer: zoneSyncer,
 	}
+}
+
+// parseTime parses time string supporting multiple formats (ISO 8601 and time-only)
+func parseTime(s string) (time.Time, error) {
+	// Try ISO 8601 full datetime formats first
+	formats := []string{
+		time.RFC3339,           // "2006-01-02T15:04:05Z07:00"
+		"2006-01-02T15:04:05Z", // UTC
+		"2006-01-02T15:04:05",  // No timezone
+		"15:04:05Z07:00",       // Time with timezone
+		"15:04:05",             // Time only
+	}
+
+	for _, format := range formats {
+		if t, err := time.Parse(format, s); err == nil {
+			return t, nil
+		}
+	}
+
+	return time.Time{}, errors.New("invalid time format, expected ISO 8601 (e.g., 2006-01-02T15:04:05+07:00) or time-only (e.g., 15:04:05)")
 }
 
 // CreateShow creates a new show for an event
@@ -51,26 +73,25 @@ func (s *showService) CreateShow(ctx context.Context, req *dto.CreateShowRequest
 	if err != nil {
 		return nil, errors.New("invalid show_date format, expected YYYY-MM-DD")
 	}
-	startTime, err := time.Parse("15:04:05Z07:00", req.StartTime)
+
+	startTime, err := parseTime(req.StartTime)
 	if err != nil {
-		// Try without timezone
-		startTime, err = time.Parse("15:04:05", req.StartTime)
-		if err != nil {
-			return nil, errors.New("invalid start_time format")
-		}
+		return nil, errors.New("invalid start_time: " + err.Error())
 	}
+
 	var endTime time.Time
 	if req.EndTime != "" {
-		endTime, err = time.Parse("15:04:05Z07:00", req.EndTime)
+		endTime, err = parseTime(req.EndTime)
 		if err != nil {
-			endTime, _ = time.Parse("15:04:05", req.EndTime)
+			return nil, errors.New("invalid end_time: " + err.Error())
 		}
 	}
+
 	var doorsOpenAt *time.Time
 	if req.DoorsOpenAt != "" {
-		t, err := time.Parse("15:04:05Z07:00", req.DoorsOpenAt)
+		t, err := parseTime(req.DoorsOpenAt)
 		if err != nil {
-			t, _ = time.Parse("15:04:05", req.DoorsOpenAt)
+			return nil, errors.New("invalid doors_open_at: " + err.Error())
 		}
 		doorsOpenAt = &t
 	}
@@ -113,6 +134,9 @@ func (s *showService) GetShowByID(ctx context.Context, id string) (*domain.Show,
 
 // ListShowsByEvent lists shows for an event
 func (s *showService) ListShowsByEvent(ctx context.Context, eventID string, filter *dto.ShowListFilter) ([]*domain.Show, int, error) {
+	if filter == nil {
+		filter = &dto.ShowListFilter{}
+	}
 	filter.SetDefaults()
 
 	// Verify event exists
@@ -143,34 +167,38 @@ func (s *showService) UpdateShow(ctx context.Context, id string, req *dto.Update
 		return nil, ErrShowNotFound
 	}
 
+	// Track status change for zone sync
+	oldStatus := show.Status
+
 	// Update fields
 	if req.Name != "" {
 		show.Name = req.Name
 	}
 	if req.ShowDate != "" {
 		showDate, err := time.Parse("2006-01-02", req.ShowDate)
-		if err == nil {
-			show.ShowDate = showDate
+		if err != nil {
+			return nil, errors.New("invalid show_date format, expected YYYY-MM-DD")
 		}
+		show.ShowDate = showDate
 	}
 	if req.StartTime != "" {
-		startTime, err := time.Parse("15:04:05Z07:00", req.StartTime)
+		startTime, err := parseTime(req.StartTime)
 		if err != nil {
-			startTime, _ = time.Parse("15:04:05", req.StartTime)
+			return nil, errors.New("invalid start_time: " + err.Error())
 		}
 		show.StartTime = startTime
 	}
 	if req.EndTime != "" {
-		endTime, err := time.Parse("15:04:05Z07:00", req.EndTime)
+		endTime, err := parseTime(req.EndTime)
 		if err != nil {
-			endTime, _ = time.Parse("15:04:05", req.EndTime)
+			return nil, errors.New("invalid end_time: " + err.Error())
 		}
 		show.EndTime = endTime
 	}
 	if req.DoorsOpenAt != "" {
-		t, err := time.Parse("15:04:05Z07:00", req.DoorsOpenAt)
+		t, err := parseTime(req.DoorsOpenAt)
 		if err != nil {
-			t, _ = time.Parse("15:04:05", req.DoorsOpenAt)
+			return nil, errors.New("invalid doors_open_at: " + err.Error())
 		}
 		show.DoorsOpenAt = &t
 	}
@@ -186,6 +214,17 @@ func (s *showService) UpdateShow(ctx context.Context, id string, req *dto.Update
 
 	if err := s.showRepo.Update(ctx, show); err != nil {
 		return nil, err
+	}
+
+	// Sync zones to Redis when status changes to on_sale
+	if s.zoneSyncer != nil {
+		if oldStatus != domain.ShowStatusOnSale && show.Status == domain.ShowStatusOnSale {
+			// Show just went on_sale - sync all zones to Redis
+			_ = s.zoneSyncer.SyncByShowID(ctx, show.ID)
+		} else if oldStatus == domain.ShowStatusOnSale && show.Status != domain.ShowStatusOnSale {
+			// Show is no longer on_sale - remove zones from Redis
+			_ = s.zoneSyncer.RemoveByShowID(ctx, show.ID)
+		}
 	}
 
 	return show, nil

@@ -27,10 +27,11 @@ type QueueReleaseWorkerConfig struct {
 }
 
 // DefaultQueueReleaseWorkerConfig returns default configuration
+// Note: JWTSecret must be set before use
 func DefaultQueueReleaseWorkerConfig() *QueueReleaseWorkerConfig {
 	return &QueueReleaseWorkerConfig{
 		ReleaseInterval:      1 * time.Second,
-		JWTSecret:            "queue-pass-secret-key",
+		JWTSecret:            "", // Must be provided via environment or config
 		DefaultMaxConcurrent: domain.DefaultMaxConcurrentBookings,
 		DefaultQueuePassTTL:  time.Duration(domain.DefaultQueuePassTTLMinutes) * time.Minute,
 	}
@@ -76,7 +77,7 @@ func NewQueueReleaseWorker(
 		cfg.ReleaseInterval = 1 * time.Second
 	}
 	if cfg.JWTSecret == "" {
-		cfg.JWTSecret = "queue-pass-secret-key"
+		panic("QueueReleaseWorkerConfig.JWTSecret is required")
 	}
 	if cfg.DefaultMaxConcurrent <= 0 {
 		cfg.DefaultMaxConcurrent = domain.DefaultMaxConcurrentBookings

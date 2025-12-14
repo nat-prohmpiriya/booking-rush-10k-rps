@@ -6,9 +6,14 @@ import { Header } from "@/components/header"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
+import {
   HelpCircle,
   Search,
-  ChevronDown,
   Ticket,
   CreditCard,
   Calendar,
@@ -225,46 +230,8 @@ const FAQ_DATA: FAQCategory[] = [
   },
 ]
 
-function FAQAccordion({ item, isOpen, onToggle }: { item: FAQItem; isOpen: boolean; onToggle: () => void }) {
-  return (
-    <div className="border-b border-border/50 last:border-b-0">
-      <button
-        onClick={onToggle}
-        className="w-full flex items-center justify-between py-4 text-left hover:text-primary transition-colors group"
-      >
-        <span className="font-medium text-foreground group-hover:text-primary pr-4">{item.question}</span>
-        <ChevronDown
-          className={`h-5 w-5 text-muted-foreground shrink-0 transition-transform duration-200 ${
-            isOpen ? "rotate-180 text-primary" : ""
-          }`}
-        />
-      </button>
-      <div
-        className={`overflow-hidden transition-all duration-300 ease-in-out ${
-          isOpen ? "max-h-96 pb-4" : "max-h-0"
-        }`}
-      >
-        <p className="text-muted-foreground leading-relaxed">{item.answer}</p>
-      </div>
-    </div>
-  )
-}
-
 function FAQCategorySection({ category }: { category: FAQCategory }) {
-  const [openItems, setOpenItems] = useState<Set<number>>(new Set())
   const Icon = category.icon
-
-  const toggleItem = (index: number) => {
-    setOpenItems((prev) => {
-      const newSet = new Set(prev)
-      if (newSet.has(index)) {
-        newSet.delete(index)
-      } else {
-        newSet.add(index)
-      }
-      return newSet
-    })
-  }
 
   return (
     <div id={category.id} className="glass rounded-xl border border-border/50 overflow-hidden scroll-mt-32">
@@ -277,14 +244,18 @@ function FAQCategorySection({ category }: { category: FAQCategory }) {
         </div>
       </div>
       <div className="p-6">
-        {category.items.map((item, index) => (
-          <FAQAccordion
-            key={index}
-            item={item}
-            isOpen={openItems.has(index)}
-            onToggle={() => toggleItem(index)}
-          />
-        ))}
+        <Accordion type="single" collapsible className="w-full">
+          {category.items.map((item, index) => (
+            <AccordionItem key={index} value={`item-${index}`} className="border-border/50">
+              <AccordionTrigger className="text-left hover:text-primary hover:no-underline">
+                <span className="font-medium text-foreground pr-4">{item.question}</span>
+              </AccordionTrigger>
+              <AccordionContent>
+                <p className="text-muted-foreground leading-relaxed">{item.answer}</p>
+              </AccordionContent>
+            </AccordionItem>
+          ))}
+        </Accordion>
       </div>
     </div>
   )

@@ -30,15 +30,15 @@ NAMESPACE="booking-rush"
 
 # PostgreSQL
 export PG_USERNAME="${PG_USERNAME:-postgres}"
-export PG_PASSWORD="${PG_PASSWORD:-BookingRush2024!}"
+export PG_PASSWORD="${PG_PASSWORD:?PG_PASSWORD is required. Set it in .env or environment}"
 export PG_DATABASE="${PG_DATABASE:-booking_rush}"
 
 # Redis
-export REDIS_PASSWORD="${REDIS_PASSWORD:-BookingRush2024!}"
+export REDIS_PASSWORD="${REDIS_PASSWORD:?REDIS_PASSWORD is required. Set it in .env or environment}"
 
 # MongoDB
 export MONGO_USERNAME="${MONGO_USERNAME:-booking_user}"
-export MONGO_PASSWORD="${MONGO_PASSWORD:-BookingRush2024!}"
+export MONGO_PASSWORD="${MONGO_PASSWORD:?MONGO_PASSWORD is required. Set it in .env or environment}"
 export MONGO_DATABASE="${MONGO_DATABASE:-booking_rush}"
 
 print_header() {

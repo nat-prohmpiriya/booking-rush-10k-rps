@@ -70,6 +70,16 @@ func (m *MockShowZoneRepository) UpdateAvailableSeats(ctx context.Context, id st
 	return nil
 }
 
+func (m *MockShowZoneRepository) ListActive(ctx context.Context) ([]*domain.ShowZone, error) {
+	var zones []*domain.ShowZone
+	for _, z := range m.zones {
+		if z.IsActive && z.DeletedAt == nil {
+			zones = append(zones, z)
+		}
+	}
+	return zones, nil
+}
+
 func (m *MockShowZoneRepository) AddZone(zone *domain.ShowZone) {
 	m.zones[zone.ID] = zone
 }
@@ -123,7 +133,7 @@ func (m *MockShowRepoForZone) AddShow(show *domain.Show) {
 func TestShowZoneService_CreateShowZone(t *testing.T) {
 	mockZoneRepo := NewMockShowZoneRepository()
 	mockShowRepo := NewMockShowRepoForZone()
-	svc := NewShowZoneService(mockZoneRepo, mockShowRepo)
+	svc := NewShowZoneService(mockZoneRepo, mockShowRepo, nil)
 
 	// Add test show
 	now := time.Now()
@@ -218,7 +228,7 @@ func TestShowZoneService_CreateShowZone(t *testing.T) {
 func TestShowZoneService_GetShowZoneByID(t *testing.T) {
 	mockZoneRepo := NewMockShowZoneRepository()
 	mockShowRepo := NewMockShowRepoForZone()
-	svc := NewShowZoneService(mockZoneRepo, mockShowRepo)
+	svc := NewShowZoneService(mockZoneRepo, mockShowRepo, nil)
 
 	// Add test zone
 	now := time.Now()
@@ -273,7 +283,7 @@ func TestShowZoneService_GetShowZoneByID(t *testing.T) {
 func TestShowZoneService_ListZonesByShow(t *testing.T) {
 	mockZoneRepo := NewMockShowZoneRepository()
 	mockShowRepo := NewMockShowRepoForZone()
-	svc := NewShowZoneService(mockZoneRepo, mockShowRepo)
+	svc := NewShowZoneService(mockZoneRepo, mockShowRepo, nil)
 
 	// Add test show
 	now := time.Now()
@@ -359,7 +369,7 @@ func TestShowZoneService_ListZonesByShow(t *testing.T) {
 func TestShowZoneService_UpdateShowZone(t *testing.T) {
 	mockZoneRepo := NewMockShowZoneRepository()
 	mockShowRepo := NewMockShowRepoForZone()
-	svc := NewShowZoneService(mockZoneRepo, mockShowRepo)
+	svc := NewShowZoneService(mockZoneRepo, mockShowRepo, nil)
 
 	// Add test zone
 	now := time.Now()
@@ -456,7 +466,7 @@ func TestShowZoneService_UpdateShowZone(t *testing.T) {
 func TestShowZoneService_DeleteShowZone(t *testing.T) {
 	mockZoneRepo := NewMockShowZoneRepository()
 	mockShowRepo := NewMockShowRepoForZone()
-	svc := NewShowZoneService(mockZoneRepo, mockShowRepo)
+	svc := NewShowZoneService(mockZoneRepo, mockShowRepo, nil)
 
 	// Add test zone
 	now := time.Now()

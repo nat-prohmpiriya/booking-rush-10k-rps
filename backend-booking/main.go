@@ -15,12 +15,14 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking/internal/di"
 	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking/internal/repository"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking/internal/saga"
 	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking/internal/service"
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/config"
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/database"
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/logger"
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/middleware"
 	pkgredis "github.com/prohmpiriya/booking-rush-10k-rps/pkg/redis"
+	pkgsaga "github.com/prohmpiriya/booking-rush-10k-rps/pkg/saga"
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/telemetry"
 )
 
@@ -133,6 +135,23 @@ func main() {
 		appLog.Info("Kafka event publisher connected")
 	}
 
+	// Initialize Saga producer and store for saga-based bookings
+	var sagaProducer saga.SagaProducer
+	var sagaStore pkgsaga.Store
+	sagaProducer, err = saga.NewKafkaSagaProducer(ctx, &saga.KafkaSagaProducerConfig{
+		Brokers:       cfg.Kafka.Brokers,
+		ClientID:      "booking-service-saga-producer",
+		MaxRetries:    3,
+		RetryInterval: time.Second,
+		Logger:        &saga.ZapLogger{},
+	})
+	if err != nil {
+		appLog.Warn(fmt.Sprintf("Saga producer init failed: %v", err))
+	} else {
+		appLog.Info("Saga producer connected")
+		sagaStore = pkgsaga.NewMemoryStore() // In-memory for now, can switch to Redis/Postgres
+	}
+
 	// Initialize repositories
 	bookingRepo := repository.NewPostgresBookingRepository(db.Pool())
 	reservationRepo := repository.NewRedisReservationRepository(redisClient)
@@ -151,6 +170,14 @@ func main() {
 		appLog.Info("Queue Lua scripts pre-loaded into Redis")
 	}
 
+	// Check if saga mode is enabled via environment variable
+	useSagaForBooking := os.Getenv("USE_SAGA_FOR_BOOKING") == "true"
+	if useSagaForBooking && sagaProducer != nil {
+		appLog.Info("Saga mode ENABLED for booking - /bookings/reserve will use saga pattern")
+	} else {
+		appLog.Info("Saga mode DISABLED for booking - using direct sync flow")
+	}
+
 	// Build dependency injection container
 	container := di.NewContainer(&di.ContainerConfig{
 		DB:              db,
@@ -167,6 +194,15 @@ func main() {
 			QueueTTL:             30 * time.Minute,
 			MaxQueueSize:         0, // Unlimited
 			EstimatedWaitPerUser: 3, // 3 seconds per user
+			JWTSecret:            cfg.JWT.Secret,
+		},
+		TicketServiceURL:  cfg.Services.TicketServiceURL, // For auto-sync zone on ZONE_NOT_FOUND
+		SagaProducer:      sagaProducer,
+		SagaStore:         sagaStore,
+		UseSagaForBooking: useSagaForBooking, // Enable saga-based booking
+		SagaServiceConfig: &service.SagaServiceConfig{
+			StepTimeout: 30 * time.Second,
+			MaxRetries:  2,
 		},
 	})
 
@@ -261,6 +297,17 @@ func main() {
 
 			// Get inventory status (PostgreSQL vs Redis)
 			admin.GET("/inventory-status", container.AdminHandler.GetInventoryStatus)
+		}
+
+		// Saga routes - async booking via saga pattern
+		sagaRoutes := v1.Group("/saga")
+		sagaRoutes.Use(userIDMiddleware()) // Extract user_id from header
+		{
+			// Start a new booking saga (async)
+			sagaRoutes.POST("/bookings", middleware.IdempotencyMiddleware(idempotencyConfig), container.SagaHandler.StartBookingSaga)
+
+			// Get saga status
+			sagaRoutes.GET("/bookings/:saga_id", container.SagaHandler.GetSagaStatus)
 		}
 	}
 

@@ -255,14 +255,14 @@ func (c *BookingConsumer) handleBookingCreated(ctx context.Context, event *Booki
 	}
 
 	// Publish payment result event
-	if processedPayment.Status == domain.PaymentStatusCompleted {
-		c.logger.Info(fmt.Sprintf("Payment successful: payment_id=%s, transaction_id=%s",
-			processedPayment.ID, processedPayment.TransactionID))
+	if processedPayment.Status == domain.PaymentStatusSucceeded {
+		c.logger.Info(fmt.Sprintf("Payment successful: payment_id=%s, gateway_payment_id=%s",
+			processedPayment.ID, processedPayment.GatewayPaymentID))
 		return c.publishPaymentEvent(ctx, PaymentEventSuccess, processedPayment, data.BookingID, data.UserID, "")
 	} else {
 		c.logger.Info(fmt.Sprintf("Payment failed: payment_id=%s, reason=%s",
-			processedPayment.ID, processedPayment.FailureReason))
-		return c.publishPaymentEvent(ctx, PaymentEventFailed, processedPayment, data.BookingID, data.UserID, processedPayment.FailureReason)
+			processedPayment.ID, processedPayment.ErrorMessage))
+		return c.publishPaymentEvent(ctx, PaymentEventFailed, processedPayment, data.BookingID, data.UserID, processedPayment.ErrorMessage)
 	}
 }
 
@@ -271,13 +271,13 @@ func (c *BookingConsumer) publishPaymentEvent(
 	ctx context.Context,
 	eventType PaymentEventType,
 	payment *domain.Payment,
-	bookingID, userID, failureReason string,
+	bookingID, userID, errorMessage string,
 ) error {
 	eventData := &PaymentEventData{
-		BookingID:     bookingID,
-		UserID:        userID,
-		ProcessedAt:   time.Now(),
-		FailureReason: failureReason,
+		BookingID:    bookingID,
+		UserID:       userID,
+		ProcessedAt:  time.Now(),
+		ErrorMessage: errorMessage,
 	}
 
 	if payment != nil {
@@ -286,9 +286,10 @@ func (c *BookingConsumer) publishPaymentEvent(
 		eventData.Currency = payment.Currency
 		eventData.Status = string(payment.Status)
 		eventData.Method = string(payment.Method)
-		eventData.TransactionID = payment.TransactionID
-		if payment.FailureReason != "" {
-			eventData.FailureReason = payment.FailureReason
+		eventData.GatewayPaymentID = payment.GatewayPaymentID
+		eventData.ErrorCode = payment.ErrorCode
+		if payment.ErrorMessage != "" {
+			eventData.ErrorMessage = payment.ErrorMessage
 		}
 	}
 

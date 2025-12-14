@@ -54,24 +54,26 @@ interface CategorizedEvents {
 }
 
 function categorizeEvents(events: EventDisplay[]): CategorizedEvents {
-  const now = new Date()
-
   return events.reduce<CategorizedEvents>(
     (acc, event) => {
-      const bookingStart = event.bookingStartAt ? new Date(event.bookingStartAt) : null
-      const bookingEnd = event.bookingEndAt ? new Date(event.bookingEndAt) : null
+      // Use saleStatus from backend (aggregated from shows)
+      const saleStatus = event.saleStatus || "scheduled"
 
-      // Check if event is past (booking ended)
-      if (bookingEnd && bookingEnd < now) {
-        acc.pastEvents.push(event)
-      }
-      // Check if event is coming soon (booking not started yet)
-      else if (bookingStart && bookingStart > now) {
-        acc.comingSoon.push(event)
-      }
-      // Default: on sale (active or no specific booking window)
-      else {
-        acc.onSale.push(event)
+      switch (saleStatus) {
+        case "on_sale":
+          acc.onSale.push(event)
+          break
+        case "scheduled":
+          acc.comingSoon.push(event)
+          break
+        case "sold_out":
+        case "completed":
+        case "cancelled":
+          acc.pastEvents.push(event)
+          break
+        default:
+          // Default to coming soon if unknown status
+          acc.comingSoon.push(event)
       }
 
       return acc

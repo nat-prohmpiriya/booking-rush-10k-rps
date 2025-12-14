@@ -127,11 +127,12 @@ func (s *eventService) ListEvents(ctx context.Context, filter *dto.EventListFilt
 	filter.SetDefaults()
 
 	repoFilter := &repository.EventFilter{
-		Status:     filter.Status,
-		TenantID:   filter.TenantID,
-		CategoryID: filter.CategoryID,
-		City:       filter.City,
-		Search:     filter.Search,
+		Status:      filter.Status,
+		TenantID:    filter.TenantID,
+		OrganizerID: filter.OrganizerID,
+		CategoryID:  filter.CategoryID,
+		City:        filter.City,
+		Search:      filter.Search,
 	}
 
 	return s.eventRepo.List(ctx, repoFilter, filter.Limit, filter.Offset)
@@ -225,6 +226,24 @@ func (s *eventService) UpdateEvent(ctx context.Context, id string, req *dto.Upda
 	}
 	if req.IsPublic != nil {
 		event.IsPublic = *req.IsPublic
+	}
+	if req.Status != nil {
+		// Validate status
+		validStatuses := map[string]bool{
+			domain.EventStatusDraft:     true,
+			domain.EventStatusPublished: true,
+			domain.EventStatusCancelled: true,
+			domain.EventStatusCompleted: true,
+		}
+		if !validStatuses[*req.Status] {
+			return nil, ErrInvalidEventStatus
+		}
+		event.Status = *req.Status
+		// Set published_at timestamp when status changes to published
+		if *req.Status == domain.EventStatusPublished && event.PublishedAt == nil {
+			now := time.Now()
+			event.PublishedAt = &now
+		}
 	}
 	if req.MetaTitle != "" {
 		event.MetaTitle = req.MetaTitle

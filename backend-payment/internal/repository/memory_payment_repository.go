@@ -10,20 +10,22 @@ import (
 // MemoryPaymentRepository implements PaymentRepository using in-memory storage
 // This is useful for testing and development
 type MemoryPaymentRepository struct {
-	payments      map[string]*domain.Payment
-	byBooking     map[string]string   // bookingID -> paymentID
-	byUser        map[string][]string // userID -> []paymentID
-	byTransaction map[string]string   // transactionID -> paymentID
-	mu            sync.RWMutex
+	payments         map[string]*domain.Payment
+	byBooking        map[string]string   // bookingID -> paymentID
+	byUser           map[string][]string // userID -> []paymentID
+	byGatewayPayment map[string]string   // gatewayPaymentID -> paymentID
+	byIdempotency    map[string]string   // idempotencyKey -> paymentID
+	mu               sync.RWMutex
 }
 
 // NewMemoryPaymentRepository creates a new in-memory payment repository
 func NewMemoryPaymentRepository() *MemoryPaymentRepository {
 	return &MemoryPaymentRepository{
-		payments:      make(map[string]*domain.Payment),
-		byBooking:     make(map[string]string),
-		byUser:        make(map[string][]string),
-		byTransaction: make(map[string]string),
+		payments:         make(map[string]*domain.Payment),
+		byBooking:        make(map[string]string),
+		byUser:           make(map[string][]string),
+		byGatewayPayment: make(map[string]string),
+		byIdempotency:    make(map[string]string),
 	}
 }
 
@@ -128,20 +130,44 @@ func (r *MemoryPaymentRepository) Update(ctx context.Context, payment *domain.Pa
 	p := *payment
 	r.payments[payment.ID] = &p
 
-	// Update transaction index if transaction ID is set
-	if payment.TransactionID != "" {
-		r.byTransaction[payment.TransactionID] = payment.ID
+	// Update gateway payment index if set
+	if payment.GatewayPaymentID != "" {
+		r.byGatewayPayment[payment.GatewayPaymentID] = payment.ID
+	}
+
+	// Update idempotency key index if set
+	if payment.IdempotencyKey != "" {
+		r.byIdempotency[payment.IdempotencyKey] = payment.ID
 	}
 
 	return nil
 }
 
-// GetByTransactionID retrieves a payment by transaction ID
-func (r *MemoryPaymentRepository) GetByTransactionID(ctx context.Context, transactionID string) (*domain.Payment, error) {
+// GetByGatewayPaymentID retrieves a payment by gateway payment ID
+func (r *MemoryPaymentRepository) GetByGatewayPaymentID(ctx context.Context, gatewayPaymentID string) (*domain.Payment, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	paymentID, exists := r.byTransaction[transactionID]
+	paymentID, exists := r.byGatewayPayment[gatewayPaymentID]
+	if !exists {
+		return nil, domain.ErrPaymentNotFound
+	}
+
+	payment, exists := r.payments[paymentID]
+	if !exists {
+		return nil, domain.ErrPaymentNotFound
+	}
+
+	p := *payment
+	return &p, nil
+}
+
+// GetByIdempotencyKey retrieves a payment by idempotency key
+func (r *MemoryPaymentRepository) GetByIdempotencyKey(ctx context.Context, idempotencyKey string) (*domain.Payment, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	paymentID, exists := r.byIdempotency[idempotencyKey]
 	if !exists {
 		return nil, domain.ErrPaymentNotFound
 	}
@@ -163,7 +189,8 @@ func (r *MemoryPaymentRepository) Clear() {
 	r.payments = make(map[string]*domain.Payment)
 	r.byBooking = make(map[string]string)
 	r.byUser = make(map[string][]string)
-	r.byTransaction = make(map[string]string)
+	r.byGatewayPayment = make(map[string]string)
+	r.byIdempotency = make(map[string]string)
 }
 
 // Count returns the total number of payments (for testing)

@@ -1,29 +1,35 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-payment/internal/dto"
 	"github.com/prohmpiriya/booking-rush-10k-rps/backend-payment/internal/service"
+	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/kafka"
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/logger"
-	"github.com/stripe/stripe-go/v76"
-	"github.com/stripe/stripe-go/v76/webhook"
+	"github.com/stripe/stripe-go/v82"
+	"github.com/stripe/stripe-go/v82/webhook"
 )
 
 // WebhookHandler handles Stripe webhook events
 type WebhookHandler struct {
 	paymentService service.PaymentService
 	webhookSecret  string
+	kafkaProducer  *kafka.Producer
 }
 
 // NewWebhookHandler creates a new WebhookHandler
-func NewWebhookHandler(paymentService service.PaymentService, webhookSecret string) *WebhookHandler {
+func NewWebhookHandler(paymentService service.PaymentService, webhookSecret string, kafkaProducer *kafka.Producer) *WebhookHandler {
 	return &WebhookHandler{
 		paymentService: paymentService,
 		webhookSecret:  webhookSecret,
+		kafkaProducer:  kafkaProducer,
 	}
 }
 
@@ -91,14 +97,15 @@ func (h *WebhookHandler) handlePaymentIntentSucceeded(c *gin.Context, event stri
 	log.Info(fmt.Sprintf("Payment succeeded: payment_id=%s, booking_id=%s, amount=%d %s",
 		paymentID, bookingID, paymentIntent.Amount, paymentIntent.Currency))
 
-	// Process the payment if we have payment_id
+	// Complete the payment if we have payment_id
+	// Use CompletePaymentFromWebhook instead of ProcessPayment to avoid creating new PaymentIntent
 	if paymentID != "" {
-		payment, err := h.paymentService.ProcessPayment(c.Request.Context(), paymentID)
+		payment, err := h.paymentService.CompletePaymentFromWebhook(c.Request.Context(), paymentID, paymentIntent.ID)
 		if err != nil {
-			log.Error(fmt.Sprintf("Failed to process payment %s: %v", paymentID, err))
+			log.Error(fmt.Sprintf("Failed to complete payment %s: %v", paymentID, err))
 			// Still return 200 to acknowledge receipt
 		} else {
-			log.Info(fmt.Sprintf("Payment %s processed successfully, status: %s", paymentID, payment.Status))
+			log.Info(fmt.Sprintf("Payment %s completed successfully, status: %s", paymentID, payment.Status))
 		}
 	}
 
@@ -119,23 +126,30 @@ func (h *WebhookHandler) handlePaymentIntentFailed(c *gin.Context, event stripe.
 	paymentID := paymentIntent.Metadata["payment_id"]
 	bookingID := paymentIntent.Metadata["booking_id"]
 
+	failureCode := "PAYMENT_FAILED"
 	failureMessage := "Payment failed"
 	if paymentIntent.LastPaymentError != nil {
 		failureMessage = paymentIntent.LastPaymentError.Msg
+		if paymentIntent.LastPaymentError.Code != "" {
+			failureCode = string(paymentIntent.LastPaymentError.Code)
+		}
 	}
 
 	log.Warn(fmt.Sprintf("Payment failed: payment_id=%s, booking_id=%s, reason=%s",
 		paymentID, bookingID, failureMessage))
 
-	// Cancel the payment if we have payment_id
+	// Mark the payment as failed if we have payment_id
 	if paymentID != "" {
-		_, err := h.paymentService.CancelPayment(c.Request.Context(), paymentID)
+		_, err := h.paymentService.FailPaymentFromWebhook(c.Request.Context(), paymentID, failureCode, failureMessage)
 		if err != nil {
-			log.Error(fmt.Sprintf("Failed to cancel payment %s: %v", paymentID, err))
+			log.Error(fmt.Sprintf("Failed to mark payment %s as failed: %v", paymentID, err))
 		}
 	}
 
-	// TODO: Trigger seat release via Kafka event to booking-service
+	// Trigger seat release via Kafka event to booking-service
+	if bookingID != "" {
+		h.publishSeatReleaseEvent(c.Request.Context(), bookingID, paymentID, dto.SeatReleaseReasonPaymentFailed, failureCode, failureMessage)
+	}
 
 	c.JSON(http.StatusOK, gin.H{"received": true})
 }
@@ -164,7 +178,10 @@ func (h *WebhookHandler) handlePaymentIntentCanceled(c *gin.Context, event strip
 		}
 	}
 
-	// TODO: Trigger seat release via Kafka event to booking-service
+	// Trigger seat release via Kafka event to booking-service
+	if bookingID != "" {
+		h.publishSeatReleaseEvent(c.Request.Context(), bookingID, paymentID, dto.SeatReleaseReasonPaymentCanceled, "PAYMENT_CANCELED", "Payment was canceled")
+	}
 
 	c.JSON(http.StatusOK, gin.H{"received": true})
 }
@@ -194,7 +211,37 @@ func (h *WebhookHandler) handleChargeRefunded(c *gin.Context, event stripe.Event
 		}
 	}
 
-	// TODO: Trigger seat release via Kafka event to booking-service
+	// Trigger seat release via Kafka event to booking-service
+	if bookingID != "" {
+		h.publishSeatReleaseEvent(c.Request.Context(), bookingID, paymentID, dto.SeatReleaseReasonPaymentRefunded, "PAYMENT_REFUNDED", "Payment was refunded")
+	}
 
 	c.JSON(http.StatusOK, gin.H{"received": true})
+}
+
+// publishSeatReleaseEvent publishes a seat release event to Kafka
+func (h *WebhookHandler) publishSeatReleaseEvent(ctx context.Context, bookingID, paymentID string, reason dto.SeatReleaseReason, failureCode, message string) {
+	log := logger.Get()
+
+	if h.kafkaProducer == nil {
+		log.Warn("Kafka producer not configured, skipping seat release event")
+		return
+	}
+
+	event := &dto.SeatReleaseEvent{
+		EventType:   "seat_release",
+		BookingID:   bookingID,
+		PaymentID:   paymentID,
+		Reason:      reason,
+		FailureCode: failureCode,
+		Message:     message,
+		Timestamp:   time.Now().UTC(),
+	}
+
+	if err := h.kafkaProducer.ProduceJSON(ctx, dto.TopicSeatRelease, event.Key(), event, nil); err != nil {
+		log.Error(fmt.Sprintf("Failed to publish seat release event: %v", err))
+		return
+	}
+
+	log.Info(fmt.Sprintf("Published seat release event: booking_id=%s, reason=%s", bookingID, reason))
 }

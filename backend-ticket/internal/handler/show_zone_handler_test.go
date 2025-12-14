@@ -90,6 +90,16 @@ func (m *MockShowZoneService) DeleteShowZone(ctx context.Context, id string) err
 	return nil
 }
 
+func (m *MockShowZoneService) ListActiveZones(ctx context.Context) ([]*domain.ShowZone, error) {
+	var zones []*domain.ShowZone
+	for _, z := range m.zones {
+		if z.IsActive && z.DeletedAt == nil {
+			zones = append(zones, z)
+		}
+	}
+	return zones, nil
+}
+
 func (m *MockShowZoneService) AddZone(zone *domain.ShowZone) {
 	m.zones[zone.ID] = zone
 }

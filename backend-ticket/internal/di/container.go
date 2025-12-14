@@ -23,6 +23,7 @@ type Container struct {
 	// TicketTypeRepo repository.TicketTypeRepository
 
 	// Services
+	ZoneSyncer      service.ZoneSyncer
 	EventService    service.EventService
 	ShowService     service.ShowService
 	ShowZoneService service.ShowZoneService
@@ -67,15 +68,16 @@ func NewContainer(cfg *ContainerConfig) *Container {
 	// c.TicketTypeRepo = repository.NewPostgresTicketTypeRepository(c.DB.Pool())
 
 	// Initialize services
+	c.ZoneSyncer = service.NewZoneSyncer(c.ShowZoneRepo, c.ShowRepo, c.Redis)
 	c.EventService = service.NewEventService(c.EventRepo)
-	c.ShowService = service.NewShowService(c.ShowRepo, c.EventRepo)
-	c.ShowZoneService = service.NewShowZoneService(c.ShowZoneRepo, c.ShowRepo)
+	c.ShowService = service.NewShowService(c.ShowRepo, c.EventRepo, c.ZoneSyncer)
+	c.ShowZoneService = service.NewShowZoneService(c.ShowZoneRepo, c.ShowRepo, c.ZoneSyncer)
 	// c.TicketService = service.NewTicketService(c.TicketTypeRepo, c.EventRepo)
 	// c.VenueService = service.NewVenueService(c.VenueRepo, c.ZoneRepo, c.SeatRepo)
 
 	// Initialize handlers
 	c.HealthHandler = handler.NewHealthHandler(c.DB)
-	c.EventHandler = handler.NewEventHandler(c.EventService)
+	c.EventHandler = handler.NewEventHandler(c.EventService, c.ShowService)
 	c.ShowHandler = handler.NewShowHandler(c.ShowService, c.EventService)
 	c.ShowZoneHandler = handler.NewShowZoneHandler(c.ShowZoneService, c.ShowService)
 	// c.TicketHandler = handler.NewTicketHandler(c.TicketService)

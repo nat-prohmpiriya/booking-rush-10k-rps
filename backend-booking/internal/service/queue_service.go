@@ -57,7 +57,7 @@ func NewQueueService(
 	maxSize := int64(0)       // 0 = unlimited
 	estimatedWait := int64(3) // 3 seconds per user
 	queuePassTTL := 5 * time.Minute
-	jwtSecret := "queue-pass-secret-key" // Default secret
+	jwtSecret := "" // Must be provided via config
 
 	if cfg != nil {
 		if cfg.QueueTTL > 0 {
@@ -72,9 +72,11 @@ func NewQueueService(
 		if cfg.QueuePassTTL > 0 {
 			queuePassTTL = cfg.QueuePassTTL
 		}
-		if cfg.JWTSecret != "" {
-			jwtSecret = cfg.JWTSecret
-		}
+		jwtSecret = cfg.JWTSecret
+	}
+
+	if jwtSecret == "" {
+		panic("QueueServiceConfig.JWTSecret is required")
 	}
 
 	return &queueService{

@@ -24,7 +24,7 @@
   1. "Booking Service - จองที่นั่ง!"
   2. "Payment Service - ตัดเงิน!"
   3. "Notification - ส่งอีเมล!"
-
+# ============================================================
 # Saga Pattern มี 2 แบบหลักๆ:
 
   Saga Pattern Types
@@ -75,9 +75,14 @@
   - orchestrator.go = Central coordinator
   - state.go = State machine (CREATED → RESERVED → PAID →
   CONFIRMED)
-
-
-# strip credit card
+# ============================================================
+# STEP TEST
+## setup stripe cli
+### Login
+stripe login
+### Forward webhooks to localhost
+stripe listen --forward-to localhost:8080/api/v1/webhooks/stripe
+##  strip credit card
 ⏺ Stripe Test Cards สำหรับทดสอบครับ:
 
   บัตรที่ผ่าน:

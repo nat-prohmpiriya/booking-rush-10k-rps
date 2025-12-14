@@ -6,6 +6,7 @@ import (
 	"github.com/prohmpiriya/booking-rush-10k-rps/backend-payment/internal/repository"
 	"github.com/prohmpiriya/booking-rush-10k-rps/backend-payment/internal/service"
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/database"
+	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/kafka"
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/redis"
 )
 
@@ -36,6 +37,7 @@ type ContainerConfig struct {
 	Redis                *redis.Client
 	PaymentRepo          repository.PaymentRepository
 	PaymentGateway       gateway.PaymentGateway
+	KafkaProducer        *kafka.Producer
 	ServiceConfig        *service.PaymentServiceConfig
 	StripeWebhookSecret  string
 	AuthServiceURL       string
@@ -60,7 +62,7 @@ func NewContainer(cfg *ContainerConfig) *Container {
 
 		// Initialize WebhookHandler if webhook secret is provided
 		if cfg.StripeWebhookSecret != "" {
-			c.WebhookHandler = handler.NewWebhookHandler(c.PaymentService, cfg.StripeWebhookSecret)
+			c.WebhookHandler = handler.NewWebhookHandler(c.PaymentService, cfg.StripeWebhookSecret, cfg.KafkaProducer)
 		}
 	}
 

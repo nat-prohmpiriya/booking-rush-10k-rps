@@ -14,12 +14,6 @@ services:
       - "8080:8080"
     environment:
       - SERVER_PORT=8080
-      - AUTH_SERVICE_URL=http://auth:8081
-      - TICKET_SERVICE_URL=http://ticket:8082
-      - BOOKING_SERVICE_URL=http://booking:8083
-      - PAYMENT_SERVICE_URL=http://payment:8084
-      - REDIS_HOST=redis
-      - KAFKA_BROKERS=redpanda:9092
     env_file:
       - .env.local
     volumes:
@@ -44,10 +38,6 @@ services:
       - "8081:8081"
     environment:
       - SERVER_PORT=8081
-      - DATABASE_HOST=postgres
-      - AUTH_DATABASE_HOST=postgres
-      - REDIS_HOST=redis
-      - KAFKA_BROKERS=redpanda:9092
     env_file:
       - .env.local
     volumes:
@@ -68,10 +58,6 @@ services:
       - "8082:8082"
     environment:
       - SERVER_PORT=8082
-      - DATABASE_HOST=postgres
-      - TICKET_DATABASE_HOST=postgres
-      - REDIS_HOST=redis
-      - KAFKA_BROKERS=redpanda:9092
     env_file:
       - .env.local
     volumes:
@@ -92,10 +78,6 @@ services:
       - "8083:8083"
     environment:
       - SERVER_PORT=8083
-      - DATABASE_HOST=postgres
-      - BOOKING_DATABASE_HOST=postgres
-      - REDIS_HOST=redis
-      - KAFKA_BROKERS=redpanda:9092
     env_file:
       - .env.local
     volumes:
@@ -123,11 +105,6 @@ services:
       - "8084:8084"
     environment:
       - SERVER_PORT=8084
-      - AUTH_SERVICE_URL=http://auth:8081
-      - DATABASE_HOST=postgres
-      - PAYMENT_DATABASE_HOST=postgres
-      - REDIS_HOST=redis
-      - KAFKA_BROKERS=redpanda:9092
     env_file:
       - .env.local
     volumes:
@@ -148,8 +125,6 @@ services:
       - NEXT_PUBLIC_API_URL=http://localhost:8080/api/v1
     volumes:
       - ./frontend-web:/app
-      - /app/node_modules
-      - /app/.next
     depends_on:
       - api-gateway
     networks:
@@ -166,10 +141,6 @@ services:
     container_name: booking-rush-inventory-worker
     environment:
       - SERVICE_NAME=inventory-worker
-      - DATABASE_HOST=postgres
-      - BOOKING_DATABASE_HOST=postgres
-      - REDIS_HOST=redis
-      - KAFKA_BROKERS=redpanda:9092
     env_file:
       - .env.local
     depends_on:
@@ -190,15 +161,74 @@ services:
     container_name: booking-rush-queue-release-worker
     environment:
       - SERVICE_NAME=queue-release-worker
-      - DATABASE_HOST=postgres
-      - BOOKING_DATABASE_HOST=postgres
-      - REDIS_HOST=redis
-      - KAFKA_BROKERS=redpanda:9092
     env_file:
       - .env.local
     depends_on:
       booking:
         condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - booking-rush-local
+
+  # ============================================
+  # Saga Pattern Workers
+  # ============================================
+
+  saga-orchestrator:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+      args:
+        SERVICE: backend-booking
+        WORKER: saga-orchestrator
+    image: booking-rush/saga-orchestrator:latest
+    container_name: booking-rush-saga-orchestrator
+    environment:
+      - SERVICE_NAME=saga-orchestrator
+    env_file:
+      - .env.local
+    depends_on:
+      booking:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - booking-rush-local
+
+  saga-step-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+      args:
+        SERVICE: backend-booking
+        WORKER: saga-step-worker
+    image: booking-rush/saga-step-worker:latest
+    container_name: booking-rush-saga-step-worker
+    environment:
+      - SERVICE_NAME=saga-step-worker
+    env_file:
+      - .env.local
+    depends_on:
+      - saga-orchestrator
+    restart: unless-stopped
+    networks:
+      - booking-rush-local
+
+  saga-payment-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+      args:
+        SERVICE: backend-payment
+        WORKER: saga-payment-worker
+    image: booking-rush/saga-payment-worker:latest
+    container_name: booking-rush-saga-payment-worker
+    environment:
+      - SERVICE_NAME=saga-payment-worker
+      - PAYMENT_GATEWAY=mock  # Override to use mock for saga testing
+    env_file:
+      - .env.local
+    depends_on:
+      - saga-orchestrator
     restart: unless-stopped
     networks:
       - booking-rush-local

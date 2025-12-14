@@ -66,16 +66,17 @@ type PaymentEvent struct {
 
 // PaymentEventData contains the payment data in the event
 type PaymentEventData struct {
-	PaymentID     string    `json:"payment_id"`
-	BookingID     string    `json:"booking_id"`
-	UserID        string    `json:"user_id"`
-	Amount        float64   `json:"amount"`
-	Currency      string    `json:"currency"`
-	Status        string    `json:"status"`
-	Method        string    `json:"method"`
-	TransactionID string    `json:"transaction_id,omitempty"`
-	FailureReason string    `json:"failure_reason,omitempty"`
-	ProcessedAt   time.Time `json:"processed_at"`
+	PaymentID        string    `json:"payment_id"`
+	BookingID        string    `json:"booking_id"`
+	UserID           string    `json:"user_id"`
+	Amount           float64   `json:"amount"`
+	Currency         string    `json:"currency"`
+	Status           string    `json:"status"`
+	Method           string    `json:"method"`
+	GatewayPaymentID string    `json:"gateway_payment_id,omitempty"`
+	ErrorCode        string    `json:"error_code,omitempty"`
+	ErrorMessage     string    `json:"error_message,omitempty"`
+	ProcessedAt      time.Time `json:"processed_at"`
 }
 
 // Topic returns the Kafka topic for payment events

@@ -105,12 +105,16 @@ func (m *MockQueueRepository) SetEventQueueConfig(ctx context.Context, eventID s
 	return args.Error(0)
 }
 
+// testJWTSecret is a constant secret used for testing only
+const testJWTSecret = "test-jwt-secret-for-unit-tests"
+
 func TestQueueService_JoinQueue_Success(t *testing.T) {
 	mockRepo := new(MockQueueRepository)
 	service := NewQueueService(mockRepo, &QueueServiceConfig{
 		QueueTTL:             30 * time.Minute,
 		MaxQueueSize:         0,
 		EstimatedWaitPerUser: 3,
+		JWTSecret:            testJWTSecret,
 	})
 
 	expectedResult := &repository.JoinQueueResult{
@@ -141,7 +145,7 @@ func TestQueueService_JoinQueue_Success(t *testing.T) {
 
 func TestQueueService_JoinQueue_AlreadyInQueue(t *testing.T) {
 	mockRepo := new(MockQueueRepository)
-	service := NewQueueService(mockRepo, nil)
+	service := NewQueueService(mockRepo, &QueueServiceConfig{JWTSecret: testJWTSecret})
 
 	expectedResult := &repository.JoinQueueResult{
 		Success:      false,
@@ -165,7 +169,7 @@ func TestQueueService_JoinQueue_AlreadyInQueue(t *testing.T) {
 
 func TestQueueService_JoinQueue_QueueFull(t *testing.T) {
 	mockRepo := new(MockQueueRepository)
-	service := NewQueueService(mockRepo, nil)
+	service := NewQueueService(mockRepo, &QueueServiceConfig{JWTSecret: testJWTSecret})
 
 	expectedResult := &repository.JoinQueueResult{
 		Success:      false,
@@ -189,7 +193,7 @@ func TestQueueService_JoinQueue_QueueFull(t *testing.T) {
 
 func TestQueueService_JoinQueue_InvalidEventID(t *testing.T) {
 	mockRepo := new(MockQueueRepository)
-	service := NewQueueService(mockRepo, nil)
+	service := NewQueueService(mockRepo, &QueueServiceConfig{JWTSecret: testJWTSecret})
 
 	req := &dto.JoinQueueRequest{
 		EventID: "",
@@ -203,7 +207,7 @@ func TestQueueService_JoinQueue_InvalidEventID(t *testing.T) {
 
 func TestQueueService_JoinQueue_InvalidUserID(t *testing.T) {
 	mockRepo := new(MockQueueRepository)
-	service := NewQueueService(mockRepo, nil)
+	service := NewQueueService(mockRepo, &QueueServiceConfig{JWTSecret: testJWTSecret})
 
 	req := &dto.JoinQueueRequest{
 		EventID: "event-123",
@@ -219,6 +223,7 @@ func TestQueueService_GetPosition_Success(t *testing.T) {
 	mockRepo := new(MockQueueRepository)
 	service := NewQueueService(mockRepo, &QueueServiceConfig{
 		EstimatedWaitPerUser: 3,
+		JWTSecret:            testJWTSecret,
 	})
 
 	expectedResult := &repository.QueuePositionResult{
@@ -248,7 +253,7 @@ func TestQueueService_GetPosition_Success(t *testing.T) {
 
 func TestQueueService_GetPosition_NotInQueue(t *testing.T) {
 	mockRepo := new(MockQueueRepository)
-	service := NewQueueService(mockRepo, nil)
+	service := NewQueueService(mockRepo, &QueueServiceConfig{JWTSecret: testJWTSecret})
 
 	expectedResult := &repository.QueuePositionResult{
 		Position:     0,
@@ -300,7 +305,7 @@ func TestQueueService_GetPosition_IsReady(t *testing.T) {
 
 func TestQueueService_LeaveQueue_Success(t *testing.T) {
 	mockRepo := new(MockQueueRepository)
-	service := NewQueueService(mockRepo, nil)
+	service := NewQueueService(mockRepo, &QueueServiceConfig{JWTSecret: testJWTSecret})
 
 	mockRepo.On("LeaveQueue", mock.Anything, "event-123", "user-123", "token-123").Return(nil)
 
@@ -321,7 +326,7 @@ func TestQueueService_LeaveQueue_Success(t *testing.T) {
 
 func TestQueueService_LeaveQueue_InvalidToken(t *testing.T) {
 	mockRepo := new(MockQueueRepository)
-	service := NewQueueService(mockRepo, nil)
+	service := NewQueueService(mockRepo, &QueueServiceConfig{JWTSecret: testJWTSecret})
 
 	mockRepo.On("LeaveQueue", mock.Anything, "event-123", "user-123", "wrong-token").Return(domain.ErrInvalidQueueToken)
 
@@ -340,7 +345,7 @@ func TestQueueService_LeaveQueue_InvalidToken(t *testing.T) {
 
 func TestQueueService_LeaveQueue_NotInQueue(t *testing.T) {
 	mockRepo := new(MockQueueRepository)
-	service := NewQueueService(mockRepo, nil)
+	service := NewQueueService(mockRepo, &QueueServiceConfig{JWTSecret: testJWTSecret})
 
 	mockRepo.On("LeaveQueue", mock.Anything, "event-123", "user-123", "token-123").Return(domain.ErrNotInQueue)
 
@@ -359,7 +364,7 @@ func TestQueueService_LeaveQueue_NotInQueue(t *testing.T) {
 
 func TestQueueService_GetQueueStatus_Success(t *testing.T) {
 	mockRepo := new(MockQueueRepository)
-	service := NewQueueService(mockRepo, nil)
+	service := NewQueueService(mockRepo, &QueueServiceConfig{JWTSecret: testJWTSecret})
 
 	mockRepo.On("GetQueueSize", mock.Anything, "event-123").Return(int64(500), nil)
 
@@ -376,7 +381,7 @@ func TestQueueService_GetQueueStatus_Success(t *testing.T) {
 
 func TestQueueService_GetQueueStatus_InvalidEventID(t *testing.T) {
 	mockRepo := new(MockQueueRepository)
-	service := NewQueueService(mockRepo, nil)
+	service := NewQueueService(mockRepo, &QueueServiceConfig{JWTSecret: testJWTSecret})
 
 	result, err := service.GetQueueStatus(context.Background(), "")
 
@@ -388,6 +393,7 @@ func TestQueueService_EstimatedWait_Calculation(t *testing.T) {
 	mockRepo := new(MockQueueRepository)
 	service := NewQueueService(mockRepo, &QueueServiceConfig{
 		EstimatedWaitPerUser: 5, // 5 seconds per user
+		JWTSecret:            testJWTSecret,
 	})
 
 	expectedResult := &repository.JoinQueueResult{

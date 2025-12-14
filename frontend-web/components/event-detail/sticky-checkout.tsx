@@ -11,6 +11,7 @@ type StickyCheckoutProps = {
   totalPrice: number
   totalTickets: number
   isEventEnded?: boolean
+  showStatus?: string // "scheduled" | "on_sale" | "sold_out" | "cancelled" | "completed"
 }
 
 export function StickyCheckout({
@@ -19,9 +20,33 @@ export function StickyCheckout({
   selectedTickets,
   totalPrice,
   totalTickets,
-  isEventEnded = false
+  isEventEnded = false,
+  showStatus
 }: StickyCheckoutProps) {
-  const isDisabled = totalTickets === 0 || isEventEnded
+  // Only allow booking when status is "on_sale"
+  const isSaleOpen = showStatus === "on_sale"
+  const isDisabled = totalTickets === 0 || isEventEnded || !isSaleOpen
+
+  // Determine button text and message based on status
+  const getStatusMessage = () => {
+    if (isEventEnded) return "This event has ended"
+    if (showStatus === "scheduled") return "Sale not open yet"
+    if (showStatus === "sold_out") return "Sold out"
+    if (showStatus === "cancelled") return "Event cancelled"
+    if (showStatus === "completed") return "Event completed"
+    if (!showStatus) return "Sale not available"
+    return null
+  }
+
+  const getButtonText = () => {
+    if (isEventEnded) return "Event Ended"
+    if (showStatus === "scheduled") return "Coming Soon"
+    if (showStatus === "sold_out") return "Sold Out"
+    if (showStatus === "cancelled") return "Cancelled"
+    if (showStatus === "completed") return "Event Ended"
+    if (!showStatus) return "Not Available"
+    return "Reserve Now"
+  }
 
   // Build queue URL with query params
   const buildQueueUrl = () => {
@@ -43,14 +68,14 @@ export function StickyCheckout({
               <p className="text-sm text-muted-foreground">Total</p>
               <p className="text-3xl font-bold text-[#d4af37]">฿{totalPrice.toLocaleString()}</p>
             </div>
-            {totalTickets > 0 && !isEventEnded && (
+            {totalTickets > 0 && isSaleOpen && !isEventEnded && (
               <div className="hidden md:block text-sm text-muted-foreground">
                 {totalTickets} {totalTickets === 1 ? "ticket" : "tickets"} selected
               </div>
             )}
-            {isEventEnded && (
-              <div className="hidden md:block text-sm text-red-400">
-                This event has ended
+            {getStatusMessage() && (
+              <div className="hidden md:block text-sm text-amber-400">
+                {getStatusMessage()}
               </div>
             )}
           </div>
@@ -62,7 +87,7 @@ export function StickyCheckout({
               className="bg-[#d4af37] hover:bg-[#d4af37]/90 text-black font-semibold px-8 h-12 disabled:bg-zinc-600 disabled:text-zinc-400"
             >
               <ShoppingCart className="w-5 h-5 mr-2" />
-              {isEventEnded ? "Event Ended" : "Reserve Now"}
+              {getButtonText()}
             </Button>
           </Link>
         </div>

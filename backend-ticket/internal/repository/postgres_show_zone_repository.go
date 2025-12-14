@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -99,22 +100,34 @@ func (r *PostgresShowZoneRepository) GetByID(ctx context.Context, id string) (*d
 	return r.scanZone(r.pool.QueryRow(ctx, query, id))
 }
 
-// GetByShowID retrieves all zones for a show with pagination
-func (r *PostgresShowZoneRepository) GetByShowID(ctx context.Context, showID string, limit, offset int) ([]*domain.ShowZone, int, error) {
+// GetByShowID retrieves all zones for a show with pagination and optional is_active filter
+func (r *PostgresShowZoneRepository) GetByShowID(ctx context.Context, showID string, isActive *bool, limit, offset int) ([]*domain.ShowZone, int, error) {
+	// Build WHERE clause
+	whereClause := "show_id = $1 AND deleted_at IS NULL"
+	args := []interface{}{showID}
+	argIndex := 2
+
+	if isActive != nil {
+		whereClause += fmt.Sprintf(" AND is_active = $%d", argIndex)
+		args = append(args, *isActive)
+		argIndex++
+	}
+
 	// Count total
-	countQuery := `SELECT COUNT(*) FROM seat_zones WHERE show_id = $1 AND deleted_at IS NULL`
+	countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM seat_zones WHERE %s`, whereClause)
 	var total int
-	err := r.pool.QueryRow(ctx, countQuery, showID).Scan(&total)
+	err := r.pool.QueryRow(ctx, countQuery, args...).Scan(&total)
 	if err != nil {
 		return nil, 0, err
 	}
 
 	// Get zones
-	query := `SELECT ` + seatZoneColumns + ` FROM seat_zones
-		WHERE show_id = $1 AND deleted_at IS NULL
+	query := fmt.Sprintf(`SELECT %s FROM seat_zones
+		WHERE %s
 		ORDER BY sort_order ASC, name ASC
-		LIMIT $2 OFFSET $3`
-	rows, err := r.pool.Query(ctx, query, showID, limit, offset)
+		LIMIT $%d OFFSET $%d`, seatZoneColumns, whereClause, argIndex, argIndex+1)
+	args = append(args, limit, offset)
+	rows, err := r.pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -220,4 +233,48 @@ func (r *PostgresShowZoneRepository) UpdateAvailableSeats(ctx context.Context, i
 		return errors.New("seat zone not found")
 	}
 	return nil
+}
+
+// ListActive retrieves all active zones for inventory sync
+func (r *PostgresShowZoneRepository) ListActive(ctx context.Context) ([]*domain.ShowZone, error) {
+	query := `SELECT ` + seatZoneColumns + ` FROM seat_zones
+		WHERE is_active = true AND deleted_at IS NULL
+		ORDER BY created_at DESC`
+	rows, err := r.pool.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var zones []*domain.ShowZone
+	for rows.Next() {
+		zone := &domain.ShowZone{}
+		err := rows.Scan(
+			&zone.ID,
+			&zone.ShowID,
+			&zone.Name,
+			&zone.Description,
+			&zone.Color,
+			&zone.Price,
+			&zone.Currency,
+			&zone.TotalSeats,
+			&zone.AvailableSeats,
+			&zone.ReservedSeats,
+			&zone.SoldSeats,
+			&zone.MinPerOrder,
+			&zone.MaxPerOrder,
+			&zone.IsActive,
+			&zone.SortOrder,
+			&zone.SaleStartAt,
+			&zone.SaleEndAt,
+			&zone.CreatedAt,
+			&zone.UpdatedAt,
+			&zone.DeletedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		zones = append(zones, zone)
+	}
+	return zones, nil
 }

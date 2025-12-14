@@ -92,8 +92,12 @@ func main() {
 	// Get JWT secret from environment
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
-		jwtSecret = "your-super-secret-jwt-key-change-in-production" // Default for development
-		appLog.Warn("JWT_SECRET not set, using default (not safe for production)")
+		if cfg.IsDevelopment() {
+			jwtSecret = "dev-only-secret-key-do-not-use-in-production"
+			appLog.Warn("JWT_SECRET not set, using dev-only default (NEVER use in production)")
+		} else {
+			appLog.Fatal("JWT_SECRET environment variable is required in production")
+		}
 	}
 
 	// Build dependency injection container

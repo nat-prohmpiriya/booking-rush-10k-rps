@@ -8,7 +8,7 @@ require (
 	github.com/gin-gonic/gin v1.11.0
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.7.6
-	github.com/stripe/stripe-go/v76 v76.25.0
+	github.com/stripe/stripe-go/v82 v82.5.1
 )
 
 require (

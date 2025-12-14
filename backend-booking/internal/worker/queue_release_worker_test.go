@@ -107,14 +107,11 @@ func (m *MockQueueRepository) SetEventQueueConfig(ctx context.Context, eventID s
 	return args.Error(0)
 }
 
+// testWorkerJWTSecret is a constant secret used for testing only
+const testWorkerJWTSecret = "test-jwt-secret-for-worker-tests"
+
 func TestNewQueueReleaseWorker(t *testing.T) {
 	mockRepo := new(MockQueueRepository)
-
-	t.Run("creates worker with default config", func(t *testing.T) {
-		worker := NewQueueReleaseWorker(nil, mockRepo, nil)
-		assert.NotNil(t, worker)
-		assert.Equal(t, 500, worker.GetDefaultMaxConcurrent())
-	})
 
 	t.Run("creates worker with custom config", func(t *testing.T) {
 		cfg := &QueueReleaseWorkerConfig{
@@ -128,16 +125,25 @@ func TestNewQueueReleaseWorker(t *testing.T) {
 		assert.Equal(t, 1000, worker.GetDefaultMaxConcurrent())
 	})
 
-	t.Run("uses defaults for invalid config values", func(t *testing.T) {
+	t.Run("uses defaults for invalid config values except JWTSecret", func(t *testing.T) {
 		cfg := &QueueReleaseWorkerConfig{
 			DefaultMaxConcurrent: -1,
 			ReleaseInterval:      0,
 			DefaultQueuePassTTL:  0,
-			JWTSecret:            "",
+			JWTSecret:            testWorkerJWTSecret, // JWTSecret is now required
 		}
 		worker := NewQueueReleaseWorker(cfg, mockRepo, nil)
 		assert.NotNil(t, worker)
 		assert.Equal(t, 500, worker.GetDefaultMaxConcurrent())
+	})
+
+	t.Run("panics when JWTSecret is empty", func(t *testing.T) {
+		cfg := &QueueReleaseWorkerConfig{
+			JWTSecret: "",
+		}
+		assert.Panics(t, func() {
+			NewQueueReleaseWorker(cfg, mockRepo, nil)
+		})
 	})
 }
 
@@ -203,7 +209,11 @@ func TestQueueReleaseWorker_ReleaseFromQueueOnce(t *testing.T) {
 
 	t.Run("returns empty when no users in queue", func(t *testing.T) {
 		mockRepo := new(MockQueueRepository)
-		cfg := DefaultQueueReleaseWorkerConfig()
+		cfg := &QueueReleaseWorkerConfig{
+			DefaultMaxConcurrent: 500,
+			DefaultQueuePassTTL:  5 * time.Minute,
+			JWTSecret:            testWorkerJWTSecret,
+		}
 		worker := NewQueueReleaseWorker(cfg, mockRepo, nil)
 
 		ctx := context.Background()
@@ -223,7 +233,11 @@ func TestQueueReleaseWorker_ReleaseFromQueueOnce(t *testing.T) {
 
 	t.Run("handles count error gracefully", func(t *testing.T) {
 		mockRepo := new(MockQueueRepository)
-		cfg := DefaultQueueReleaseWorkerConfig()
+		cfg := &QueueReleaseWorkerConfig{
+			DefaultMaxConcurrent: 500,
+			DefaultQueuePassTTL:  5 * time.Minute,
+			JWTSecret:            testWorkerJWTSecret,
+		}
 		worker := NewQueueReleaseWorker(cfg, mockRepo, nil)
 
 		ctx := context.Background()
@@ -242,7 +256,11 @@ func TestQueueReleaseWorker_ReleaseFromQueueOnce(t *testing.T) {
 
 	t.Run("uses custom event config", func(t *testing.T) {
 		mockRepo := new(MockQueueRepository)
-		cfg := DefaultQueueReleaseWorkerConfig()
+		cfg := &QueueReleaseWorkerConfig{
+			DefaultMaxConcurrent: 500,
+			DefaultQueuePassTTL:  5 * time.Minute,
+			JWTSecret:            testWorkerJWTSecret,
+		}
 		worker := NewQueueReleaseWorker(cfg, mockRepo, nil)
 
 		ctx := context.Background()
@@ -356,7 +374,8 @@ func TestDefaultQueueReleaseWorkerConfig(t *testing.T) {
 	assert.Equal(t, 500, cfg.DefaultMaxConcurrent)
 	assert.Equal(t, 1*time.Second, cfg.ReleaseInterval)
 	assert.Equal(t, 5*time.Minute, cfg.DefaultQueuePassTTL)
-	assert.NotEmpty(t, cfg.JWTSecret)
+	// JWTSecret is now empty by default and must be provided
+	assert.Empty(t, cfg.JWTSecret)
 }
 
 func TestGenerateUniqueID(t *testing.T) {

@@ -5,8 +5,14 @@ export interface ApiResponse<T> {
   message?: string
 }
 
+export interface ApiErrorDetails {
+  code?: string
+  message?: string
+}
+
 export interface ApiError {
-  error: string
+  success: false
+  error: ApiErrorDetails | string
   code?: string
   message?: string
 }
@@ -77,6 +83,7 @@ export interface EventResponse {
   booking_start_at?: string
   booking_end_at?: string
   status: string
+  sale_status: string // Aggregated from shows: scheduled, on_sale, sold_out, cancelled, completed
   is_featured: boolean
   is_public: boolean
   meta_title: string
