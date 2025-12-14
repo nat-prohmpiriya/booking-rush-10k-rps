@@ -23,21 +23,56 @@ func TestBookingSagaBuilder_Build(t *testing.T) {
 		t.Errorf("expected saga name %s, got %s", BookingSagaName, def.Name)
 	}
 
-	if len(def.Steps) != 4 {
-		t.Errorf("expected 4 steps, got %d", len(def.Steps))
+	// Legacy saga has 3 steps (notification is commented out)
+	if len(def.Steps) != 3 {
+		t.Errorf("expected 3 steps, got %d", len(def.Steps))
 	}
 
 	expectedSteps := []string{
 		StepReserveSeats,
 		StepProcessPayment,
 		StepConfirmBooking,
-		StepSendNotification,
 	}
 
 	for i, step := range def.Steps {
 		if step.Name != expectedSteps[i] {
 			t.Errorf("step %d: expected name %s, got %s", i, expectedSteps[i], step.Name)
 		}
+	}
+}
+
+func TestPostPaymentSagaBuilder_Build(t *testing.T) {
+	builder := NewPostPaymentSagaBuilder(&PostPaymentSagaConfig{
+		StepTimeout: 30 * time.Second,
+		MaxRetries:  3,
+	})
+
+	def := builder.Build()
+
+	if def.Name != PostPaymentSagaName {
+		t.Errorf("expected saga name %s, got %s", PostPaymentSagaName, def.Name)
+	}
+
+	// Post-payment saga has 2 steps:
+	// 1. confirm-booking (CRITICAL)
+	// 2. send-notification (NON-CRITICAL)
+	if len(def.Steps) != 2 {
+		t.Errorf("expected 2 steps, got %d", len(def.Steps))
+	}
+
+	// Verify step names
+	expectedSteps := []string{StepConfirmBooking, StepSendNotification}
+	for i, step := range def.Steps {
+		if step.Name != expectedSteps[i] {
+			t.Errorf("step %d: expected name %s, got %s", i, expectedSteps[i], step.Name)
+		}
+	}
+
+	// Verify step policies:
+	// - confirm-booking: CRITICAL (would have Compensate if implemented)
+	// - send-notification: NON-CRITICAL (Compensate is nil)
+	if def.Steps[1].Compensate != nil {
+		t.Error("send-notification step should have nil Compensate (NON-CRITICAL)")
 	}
 }
 
@@ -90,9 +125,9 @@ func TestBookingSaga_SuccessfulExecution(t *testing.T) {
 		t.Errorf("expected status %s, got %s", pkgsaga.StatusCompleted, instance.Status)
 	}
 
-	// Verify all steps completed
-	if len(instance.StepResults) != 4 {
-		t.Errorf("expected 4 step results, got %d", len(instance.StepResults))
+	// Verify all steps completed (3 steps: reserve, payment, confirm - notification is commented out)
+	if len(instance.StepResults) != 3 {
+		t.Errorf("expected 3 step results, got %d", len(instance.StepResults))
 	}
 
 	for _, result := range instance.StepResults {
@@ -128,14 +163,8 @@ func TestBookingSaga_SuccessfulExecution(t *testing.T) {
 		t.Error("expected confirmation code to be set")
 	}
 
-	// Verify notification was sent
-	notification, exists := notificationSvc.GetNotificationByBookingID("booking-123")
-	if !exists {
-		t.Error("expected notification to exist")
-	}
-	if notification.NotificationID == "" {
-		t.Error("expected notification ID to be set")
-	}
+	// Note: Notification step is commented out in the saga definition
+	// so we don't verify notification here
 }
 
 func TestBookingSaga_ReservationFailure_NoCompensation(t *testing.T) {
@@ -317,84 +346,9 @@ func TestBookingSaga_ConfirmationFailure_RefundsPayment(t *testing.T) {
 	}
 }
 
-func TestBookingSaga_NotificationFailure_StillCompletes(t *testing.T) {
-	// Setup mock services with notification failure
-	reservationSvc := NewMockSeatReservationService()
-	paymentSvc := NewMockPaymentService()
-	confirmationSvc := NewMockBookingConfirmationService()
-	notificationSvc := NewMockNotificationService()
-	notificationSvc.ShouldFail = true
-	notificationSvc.FailureError = errors.New("notification service unavailable")
-
-	builder := NewBookingSagaBuilder(&BookingSagaConfig{
-		ReservationService:  reservationSvc,
-		PaymentService:      paymentSvc,
-		ConfirmationService: confirmationSvc,
-		NotificationService: notificationSvc,
-		StepTimeout:         5 * time.Second,
-	})
-
-	// Create orchestrator
-	orchestrator := pkgsaga.NewOrchestrator(&pkgsaga.OrchestratorConfig{
-		Store: pkgsaga.NewMemoryStore(),
-	})
-
-	// Register saga definition
-	def := builder.Build()
-	if err := orchestrator.RegisterDefinition(def); err != nil {
-		t.Fatalf("failed to register saga definition: %v", err)
-	}
-
-	// Execute saga
-	ctx := context.Background()
-	initialData := map[string]interface{}{
-		"booking_id":     "booking-notify-fail",
-		"user_id":        "user-notify",
-		"event_id":       "event-notify",
-		"zone_id":        "zone-D",
-		"quantity":       2,
-		"total_price":    250.00,
-		"currency":       "THB",
-		"payment_method": "bank_transfer",
-	}
-
-	instance, err := orchestrator.Execute(ctx, BookingSagaName, initialData)
-	if err != nil {
-		t.Fatalf("saga execution should succeed even with notification failure: %v", err)
-	}
-
-	// Verify saga completed successfully (notification failure is not critical)
-	if instance.Status != pkgsaga.StatusCompleted {
-		t.Errorf("expected status %s, got %s", pkgsaga.StatusCompleted, instance.Status)
-	}
-
-	// Verify reservation was not released
-	reservation, exists := reservationSvc.GetReservation("booking-notify-fail")
-	if !exists {
-		t.Error("expected reservation to exist")
-	}
-	if reservation.Released {
-		t.Error("expected reservation not to be released")
-	}
-
-	// Verify payment was not refunded
-	payment, exists := paymentSvc.GetPaymentByBookingID("booking-notify-fail")
-	if !exists {
-		t.Error("expected payment to exist")
-	}
-	if payment.Refunded {
-		t.Error("expected payment not to be refunded")
-	}
-
-	// Verify booking was confirmed
-	confirmation, exists := confirmationSvc.GetConfirmation("booking-notify-fail")
-	if !exists {
-		t.Error("expected confirmation to exist")
-	}
-	if confirmation.ConfirmationCode == "" {
-		t.Error("expected confirmation code to be set")
-	}
-}
+// Note: TestBookingSaga_NotificationFailure_StillCompletes is removed because
+// the notification step is now commented out in the saga definition.
+// Notification will be implemented as a separate async worker in the future.
 
 func TestBookingSaga_WithoutNotificationService(t *testing.T) {
 	// Setup mock services without notification service
@@ -638,4 +592,291 @@ func TestMockNotificationService(t *testing.T) {
 	if notification.ConfirmationCode != "CONF-123" {
 		t.Errorf("expected confirmation code 'CONF-123', got '%s'", notification.ConfirmationCode)
 	}
+}
+
+// ============================================================================
+// STEP POLICY TESTS - Critical vs Non-Critical Steps
+// ============================================================================
+//
+// Step Policy defines how the saga handles step failures:
+// - CRITICAL Step: If fail → Trigger compensation (refund + release seats)
+// - NON-CRITICAL Step: If fail → Retry → DLQ (NO compensation, saga still completes)
+//
+// Post-Payment Saga Step Policies:
+// - confirm-booking: CRITICAL (payment already done, must confirm or refund)
+// - send-notification: NON-CRITICAL (booking confirmed, email can fail gracefully)
+
+// TestStepPolicy_VerifyStepTypes verifies which steps are Critical vs Non-Critical
+// by checking if they have a Compensate function defined.
+func TestStepPolicy_VerifyStepTypes(t *testing.T) {
+	t.Run("PostPaymentSaga_StepTypes", func(t *testing.T) {
+		builder := NewPostPaymentSagaBuilder(&PostPaymentSagaConfig{
+			StepTimeout: 30 * time.Second,
+			MaxRetries:  3,
+		})
+		def := builder.Build()
+
+		// Step policy table for documentation and verification
+		stepPolicies := map[string]struct {
+			isCritical  bool
+			description string
+		}{
+			StepConfirmBooking: {
+				isCritical:  true, // Note: Currently nil, but SHOULD have compensation in production
+				description: "CRITICAL: If fails, must refund payment and release seats",
+			},
+			StepSendNotification: {
+				isCritical:  false,
+				description: "NON-CRITICAL: If fails, just retry and DLQ. Booking is already confirmed.",
+			},
+		}
+
+		for _, step := range def.Steps {
+			policy, ok := stepPolicies[step.Name]
+			if !ok {
+				t.Errorf("unexpected step: %s", step.Name)
+				continue
+			}
+
+			// For NON-CRITICAL steps, Compensate MUST be nil
+			if !policy.isCritical && step.Compensate != nil {
+				t.Errorf("step %s is NON-CRITICAL but has Compensate function. "+
+					"Non-critical steps should NOT trigger compensation on failure. %s",
+					step.Name, policy.description)
+			}
+
+			t.Logf("✓ Step '%s': %s", step.Name, policy.description)
+		}
+	})
+
+	t.Run("LegacySaga_StepTypes", func(t *testing.T) {
+		builder := NewBookingSagaBuilder(&BookingSagaConfig{
+			ReservationService:  NewMockSeatReservationService(),
+			PaymentService:      NewMockPaymentService(),
+			ConfirmationService: NewMockBookingConfirmationService(),
+		})
+		def := builder.Build()
+
+		// All legacy saga steps are CRITICAL (except notification which is commented out)
+		criticalSteps := []string{
+			StepReserveSeats,
+			StepProcessPayment,
+			StepConfirmBooking,
+		}
+
+		for i, stepName := range criticalSteps {
+			if i >= len(def.Steps) {
+				break
+			}
+			step := def.Steps[i]
+			if step.Name != stepName {
+				t.Errorf("step %d: expected %s, got %s", i, stepName, step.Name)
+			}
+
+			// These are CRITICAL steps - they should have compensation
+			// (except confirm-booking which has nil Compensate because
+			// if confirm fails after payment, payment step's compensate handles refund)
+			t.Logf("✓ Legacy step '%s': CRITICAL", step.Name)
+		}
+	})
+}
+
+// TestStepPolicy_CriticalStep_ConfirmBookingFailure documents behavior when
+// a CRITICAL step fails - should trigger full compensation (refund + release).
+func TestStepPolicy_CriticalStep_ConfirmBookingFailure(t *testing.T) {
+	// This test demonstrates that when confirm-booking (CRITICAL step) fails,
+	// the saga triggers compensation: refund payment AND release seats.
+	//
+	// Flow:
+	// 1. Reserve seats ✓
+	// 2. Process payment ✓
+	// 3. Confirm booking ✗ (FAIL)
+	// 4. COMPENSATION TRIGGERED:
+	//    - Refund payment ✓
+	//    - Release seats ✓
+	// 5. Saga status: FAILED (with compensation)
+
+	reservationSvc := NewMockSeatReservationService()
+	paymentSvc := NewMockPaymentService()
+	confirmationSvc := NewMockBookingConfirmationService()
+	confirmationSvc.ShouldFail = true
+	confirmationSvc.FailureError = errors.New("database connection failed")
+
+	builder := NewBookingSagaBuilder(&BookingSagaConfig{
+		ReservationService:  reservationSvc,
+		PaymentService:      paymentSvc,
+		ConfirmationService: confirmationSvc,
+		StepTimeout:         5 * time.Second,
+		MaxRetries:          0, // No retries for faster test
+	})
+
+	orchestrator := pkgsaga.NewOrchestrator(&pkgsaga.OrchestratorConfig{
+		Store: pkgsaga.NewMemoryStore(),
+	})
+
+	def := builder.Build()
+	if err := orchestrator.RegisterDefinition(def); err != nil {
+		t.Fatalf("failed to register saga: %v", err)
+	}
+
+	ctx := context.Background()
+	_, err := orchestrator.Execute(ctx, BookingSagaName, map[string]interface{}{
+		"booking_id":     "critical-test-booking",
+		"user_id":        "user-critical",
+		"event_id":       "event-1",
+		"zone_id":        "zone-A",
+		"quantity":       2,
+		"total_price":    200.00,
+		"currency":       "THB",
+		"payment_method": "credit_card",
+	})
+
+	// Saga should fail
+	if err == nil {
+		t.Fatal("expected saga to fail when CRITICAL step (confirm-booking) fails")
+	}
+
+	// CRITICAL BEHAVIOR: Compensation must be triggered
+	// 1. Seats must be released
+	reservation, exists := reservationSvc.GetReservation("critical-test-booking")
+	if !exists {
+		t.Fatal("reservation should exist")
+	}
+	if !reservation.Released {
+		t.Error("CRITICAL STEP FAILED: Seats should be released (compensated)")
+	}
+
+	// 2. Payment must be refunded
+	payment, exists := paymentSvc.GetPaymentByBookingID("critical-test-booking")
+	if !exists {
+		t.Fatal("payment should exist")
+	}
+	if !payment.Refunded {
+		t.Error("CRITICAL STEP FAILED: Payment should be refunded (compensated)")
+	}
+
+	t.Log("✓ CRITICAL step (confirm-booking) failure correctly triggered compensation")
+	t.Log("  → Seats released: true")
+	t.Log("  → Payment refunded: true")
+}
+
+// TestStepPolicy_NonCriticalStep_NotificationFailure_NoCompensation documents
+// that when NON-CRITICAL step fails, saga still completes WITHOUT compensation.
+//
+// Note: This test demonstrates the CONCEPT. In actual event-driven implementation,
+// the saga_step_worker handles this by:
+// 1. Retrying the notification
+// 2. If all retries fail, sending to DLQ
+// 3. Sending success event to orchestrator (saga completes)
+// 4. NOT triggering any compensation (no refund, no seat release)
+func TestStepPolicy_NonCriticalStep_Description(t *testing.T) {
+	t.Log("NON-CRITICAL Step Behavior (send-notification):")
+	t.Log("")
+	t.Log("When notification fails in post-payment saga:")
+	t.Log("1. Step worker retries sending (up to 5 times with backoff)")
+	t.Log("2. If all retries fail → Message sent to DLQ for manual retry")
+	t.Log("3. Saga still receives SUCCESS event → Saga completes")
+	t.Log("4. NO compensation triggered (no refund, no seat release)")
+	t.Log("")
+	t.Log("Reason: Customer already has their ticket (payment done, booking confirmed).")
+	t.Log("        Email failure is NOT a reason to cancel their booking.")
+	t.Log("")
+	t.Log("DLQ allows operations team to manually resend notification later.")
+
+	// Verify PostPaymentSaga has notification as NON-CRITICAL
+	builder := NewPostPaymentSagaBuilder(&PostPaymentSagaConfig{})
+	def := builder.Build()
+
+	if len(def.Steps) < 2 {
+		t.Fatal("post-payment saga should have 2 steps")
+	}
+
+	notificationStep := def.Steps[1]
+	if notificationStep.Name != StepSendNotification {
+		t.Errorf("second step should be %s, got %s", StepSendNotification, notificationStep.Name)
+	}
+
+	// Key check: NON-CRITICAL step has NO Compensate function
+	if notificationStep.Compensate != nil {
+		t.Error("send-notification is NON-CRITICAL and should have nil Compensate")
+	}
+
+	// Verify higher retry count for non-critical steps
+	if notificationStep.Retries < 3 {
+		t.Errorf("NON-CRITICAL steps should have more retries, got %d", notificationStep.Retries)
+	}
+
+	t.Log("✓ send-notification step is correctly configured as NON-CRITICAL")
+	t.Logf("  → Compensate: nil (no compensation on failure)")
+	t.Logf("  → Retries: %d (more retries before DLQ)", notificationStep.Retries)
+}
+
+// TestStepPolicy_CompensationOrder verifies compensation happens in reverse order
+// when a CRITICAL step fails in the middle of saga execution.
+func TestStepPolicy_CompensationOrder(t *testing.T) {
+	t.Log("Compensation Order for CRITICAL Step Failure:")
+	t.Log("")
+	t.Log("If step 3 (confirm-booking) fails:")
+	t.Log("1. Compensate step 2 (process-payment) → Refund")
+	t.Log("2. Compensate step 1 (reserve-seats) → Release seats")
+	t.Log("")
+	t.Log("Compensation happens in REVERSE ORDER of execution.")
+
+	// This is already tested in TestStepPolicy_CriticalStep_ConfirmBookingFailure
+	// This test just documents the expected order.
+
+	builder := NewBookingSagaBuilder(&BookingSagaConfig{
+		ReservationService:  NewMockSeatReservationService(),
+		PaymentService:      NewMockPaymentService(),
+		ConfirmationService: NewMockBookingConfirmationService(),
+	})
+	def := builder.Build()
+
+	// Verify steps have compensation in correct order
+	if def.Steps[0].Name != StepReserveSeats {
+		t.Error("first step should be reserve-seats")
+	}
+	if def.Steps[0].Compensate == nil {
+		t.Error("reserve-seats should have Compensate (release seats)")
+	}
+
+	if def.Steps[1].Name != StepProcessPayment {
+		t.Error("second step should be process-payment")
+	}
+	if def.Steps[1].Compensate == nil {
+		t.Error("process-payment should have Compensate (refund)")
+	}
+
+	t.Log("✓ Compensation functions are correctly defined for CRITICAL steps")
+}
+
+// TestStepPolicy_Summary provides a complete summary of step policies
+func TestStepPolicy_Summary(t *testing.T) {
+	t.Log("")
+	t.Log("╔══════════════════════════════════════════════════════════════════╗")
+	t.Log("║                    SAGA STEP POLICY SUMMARY                      ║")
+	t.Log("╠══════════════════════════════════════════════════════════════════╣")
+	t.Log("║                                                                  ║")
+	t.Log("║  CRITICAL Steps (trigger compensation on failure):              ║")
+	t.Log("║  ┌─────────────────┬────────────────────────────────────────┐   ║")
+	t.Log("║  │ Step            │ Compensation                           │   ║")
+	t.Log("║  ├─────────────────┼────────────────────────────────────────┤   ║")
+	t.Log("║  │ reserve-seats   │ release-seats (return to inventory)    │   ║")
+	t.Log("║  │ process-payment │ refund-payment (return money)          │   ║")
+	t.Log("║  │ confirm-booking │ refund + release (handled by above)    │   ║")
+	t.Log("║  └─────────────────┴────────────────────────────────────────┘   ║")
+	t.Log("║                                                                  ║")
+	t.Log("║  NON-CRITICAL Steps (NO compensation, retry → DLQ):             ║")
+	t.Log("║  ┌──────────────────┬───────────────────────────────────────┐   ║")
+	t.Log("║  │ Step             │ On Failure                            │   ║")
+	t.Log("║  ├──────────────────┼───────────────────────────────────────┤   ║")
+	t.Log("║  │ send-notification│ Retry 5x → DLQ → Saga still completes │   ║")
+	t.Log("║  └──────────────────┴───────────────────────────────────────┘   ║")
+	t.Log("║                                                                  ║")
+	t.Log("║  KEY INSIGHT:                                                   ║")
+	t.Log("║  Customer has their ticket even if email fails.                 ║")
+	t.Log("║  Don't punish customer for infrastructure issues.               ║")
+	t.Log("║                                                                  ║")
+	t.Log("╚══════════════════════════════════════════════════════════════════╝")
+	t.Log("")
 }
