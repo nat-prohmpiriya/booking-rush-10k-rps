@@ -19,7 +19,7 @@ spec:
         - name: ghcr-secret
       containers:
         - name: saga-payment-worker
-          image: ghcr.io/nat-prohmpiriya/booking-rush/saga-payment-worker:latest
+          image: ghcr.io/nat-prohmpiriya/booking-rush/saga-payment-worker:b5efc25
           imagePullPolicy: Always
           env:
             - name: SERVICE_NAME
