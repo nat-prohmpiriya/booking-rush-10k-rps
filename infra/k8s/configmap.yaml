@@ -16,7 +16,7 @@ data:
   SERVER_WRITE_TIMEOUT: "30s"
   SERVER_IDLE_TIMEOUT: "120s"
 
-  # PostgreSQL
+  # PostgreSQL (Generic - for services using DATABASE_*)
   DATABASE_HOST: "booking-rush-pg-postgresql.booking-rush.svc.cluster.local"
   DATABASE_PORT: "5432"
   DATABASE_USER: "postgres"
@@ -26,6 +26,28 @@ data:
   DATABASE_MAX_IDLE_CONNS: "5"
   DATABASE_CONN_MAX_LIFETIME: "1h"
   DATABASE_CONN_MAX_IDLE_TIME: "30m"
+
+  # Booking Database (for booking workers using BOOKING_DATABASE_*)
+  BOOKING_DATABASE_HOST: "booking-rush-pg-postgresql.booking-rush.svc.cluster.local"
+  BOOKING_DATABASE_PORT: "5432"
+  BOOKING_DATABASE_USER: "postgres"
+  BOOKING_DATABASE_DBNAME: "booking_rush"
+  BOOKING_DATABASE_SSLMODE: "disable"
+  BOOKING_DATABASE_MAX_OPEN_CONNS: "10"
+  BOOKING_DATABASE_MAX_IDLE_CONNS: "5"
+  BOOKING_DATABASE_CONN_MAX_LIFETIME: "1h"
+  BOOKING_DATABASE_CONN_MAX_IDLE_TIME: "30m"
+
+  # Payment Database (for payment workers using PAYMENT_DATABASE_*)
+  PAYMENT_DATABASE_HOST: "booking-rush-pg-postgresql.booking-rush.svc.cluster.local"
+  PAYMENT_DATABASE_PORT: "5432"
+  PAYMENT_DATABASE_USER: "postgres"
+  PAYMENT_DATABASE_DBNAME: "booking_rush"
+  PAYMENT_DATABASE_SSLMODE: "disable"
+  PAYMENT_DATABASE_MAX_OPEN_CONNS: "10"
+  PAYMENT_DATABASE_MAX_IDLE_CONNS: "5"
+  PAYMENT_DATABASE_CONN_MAX_LIFETIME: "1h"
+  PAYMENT_DATABASE_CONN_MAX_IDLE_TIME: "30m"
 
   # Redis
   REDIS_HOST: "booking-rush-redis-master.booking-rush.svc.cluster.local"

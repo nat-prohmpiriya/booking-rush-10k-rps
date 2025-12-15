@@ -27,19 +27,9 @@ export function Footer() {
             <h3 className="font-bold mb-4 text-black">Company</h3>
             <ul className="space-y-2 text-sm text-black font-bold">
               <li>
-                <a href="#" className="hover:text-gray-700 transition-colors">
+                <Link href="/about" className="hover:text-gray-700 transition-colors">
                   About Us
-                </a>
-              </li>
-              <li>
-                <a href="#" className="hover:text-gray-700 transition-colors">
-                  Careers
-                </a>
-              </li>
-              <li>
-                <a href="#" className="hover:text-gray-700 transition-colors">
-                  Press
-                </a>
+                </Link>
               </li>
             </ul>
           </div>
@@ -47,12 +37,7 @@ export function Footer() {
             <h3 className="font-bold mb-4 text-black">Support</h3>
             <ul className="space-y-2 text-sm text-black font-bold">
               <li>
-                <a href="#" className="hover:text-gray-700 transition-colors">
-                  Help Center
-                </a>
-              </li>
-              <li>
-                <a href="#" className="hover:text-gray-700 transition-colors">
+                <a href="https://n2p.painaina.com/" target="_blank" rel="noopener noreferrer" className="hover:text-gray-700 transition-colors">
                   Contact Us
                 </a>
               </li>
@@ -75,11 +60,6 @@ export function Footer() {
                 <Link href="/terms" className="hover:text-gray-700 transition-colors">
                   Terms of Service
                 </Link>
-              </li>
-              <li>
-                <a href="#" className="hover:text-gray-700 transition-colors">
-                  Cookie Policy
-                </a>
               </li>
             </ul>
           </div>

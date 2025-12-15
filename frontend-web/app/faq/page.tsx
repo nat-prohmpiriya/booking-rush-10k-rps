@@ -384,11 +384,9 @@ export default function FAQPage() {
               Can&apos;t find what you&apos;re looking for? Our support team is here to help.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/contact">
                 <Button className="bg-linear-to-r from-primary to-amber-400 hover:from-amber-400 hover:to-primary text-primary-foreground font-semibold">
                   Contact Support
                 </Button>
-              </Link>
               <Button variant="outline" className="border-primary/50 text-primary hover:bg-primary/10">
                 support@bookingrush.com
               </Button>
