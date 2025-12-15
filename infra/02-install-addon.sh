@@ -7,7 +7,7 @@ set -e
 # Bitnami Helm charts:
 # - PostgreSQL (relational database)
 # - Redis (cache & session)
-# - MongoDB (document database)
+# - MongoDB (document database) [DISABLED - not used yet]
 # - Redpanda (Kafka-compatible message queue)
 # ============================================================
 
@@ -36,10 +36,10 @@ export PG_DATABASE="${PG_DATABASE:-booking_rush}"
 # Redis
 export REDIS_PASSWORD="${REDIS_PASSWORD:?REDIS_PASSWORD is required. Set it in .env or environment}"
 
-# MongoDB
-export MONGO_USERNAME="${MONGO_USERNAME:-booking_user}"
-export MONGO_PASSWORD="${MONGO_PASSWORD:?MONGO_PASSWORD is required. Set it in .env or environment}"
-export MONGO_DATABASE="${MONGO_DATABASE:-booking_rush}"
+# MongoDB [DISABLED - not used yet]
+# export MONGO_USERNAME="${MONGO_USERNAME:-booking_user}"
+# export MONGO_PASSWORD="${MONGO_PASSWORD:?MONGO_PASSWORD is required. Set it in .env or environment}"
+# export MONGO_DATABASE="${MONGO_DATABASE:-booking_rush}"
 
 print_header() {
     echo -e "\n${BLUE}============================================================${NC}"
@@ -251,13 +251,14 @@ print_summary() {
     echo "  Port: 6379"
     echo "  Password: $REDIS_PASSWORD"
     echo ""
-    echo "MongoDB:"
-    echo "  Host: booking-rush-mongodb.$NAMESPACE.svc.cluster.local"
-    echo "  Port: 27017"
-    echo "  Database: booking_rush"
-    echo "  Username: booking_user (or root)"
-    echo "  Password: $MONGO_PASSWORD"
-    echo ""
+    # MongoDB [DISABLED]
+    # echo "MongoDB:"
+    # echo "  Host: booking-rush-mongodb.$NAMESPACE.svc.cluster.local"
+    # echo "  Port: 27017"
+    # echo "  Database: booking_rush"
+    # echo "  Username: booking_user (or root)"
+    # echo "  Password: $MONGO_PASSWORD"
+    # echo ""
     echo "Redpanda (Kafka):"
     echo "  Brokers: booking-rush-redpanda.$NAMESPACE.svc.cluster.local:9092"
     echo ""
@@ -275,10 +276,10 @@ show_menu() {
     echo "Target: $SSH_USER@$HOST"
     echo "Namespace: $NAMESPACE"
     echo ""
-    echo "1) Install ALL (PostgreSQL + Redis + MongoDB + Redpanda + Node Exporter)"
+    echo "1) Install ALL (PostgreSQL + Redis + Redpanda + Node Exporter)"
     echo "2) Install PostgreSQL (Helm)"
     echo "3) Install Redis (Helm)"
-    echo "4) Install MongoDB (Helm)"
+    echo "4) Install MongoDB (Helm) [DISABLED]"
     echo "5) Install Redpanda (Helm)"
     echo "6) Install Node Exporter (Monitoring)"
     echo "7) Show status"
@@ -292,7 +293,7 @@ show_menu() {
             create_namespace
             install_postgresql
             install_redis
-            install_mongodb
+            # install_mongodb  # DISABLED - not used yet
             install_redpanda
             install_node_exporter
             print_summary
@@ -308,9 +309,11 @@ show_menu() {
             install_redis
             ;;
         4)
-            install_helm
-            create_namespace
-            install_mongodb
+            # MongoDB is disabled - uncomment when needed
+            print_warning "MongoDB is currently disabled. Uncomment in script when needed."
+            # install_helm
+            # create_namespace
+            # install_mongodb
             ;;
         5)
             install_helm
@@ -345,7 +348,7 @@ if [ "$1" == "--all" ]; then
     create_namespace
     install_postgresql
     install_redis
-    install_mongodb
+    # install_mongodb  # DISABLED - not used yet
     install_redpanda
     install_node_exporter
     print_summary
@@ -358,9 +361,11 @@ elif [ "$1" == "--redis" ]; then
     create_namespace
     install_redis
 elif [ "$1" == "--mongodb" ]; then
-    install_helm
-    create_namespace
-    install_mongodb
+    # MongoDB is disabled - uncomment when needed
+    print_warning "MongoDB is currently disabled. Uncomment in script when needed."
+    # install_helm
+    # create_namespace
+    # install_mongodb
 elif [ "$1" == "--redpanda" ]; then
     install_helm
     create_namespace
@@ -378,10 +383,10 @@ elif [ "$1" == "--help" ] || [ "$1" == "-h" ]; then
     echo "Install production-ready add-ons on k3s"
     echo ""
     echo "Options:"
-    echo "  --all            Install all (PostgreSQL + Redis + MongoDB + Redpanda + Node Exporter)"
+    echo "  --all            Install all (PostgreSQL + Redis + Redpanda + Node Exporter)"
     echo "  --pg             Install PostgreSQL (Helm)"
     echo "  --redis          Install Redis (Helm)"
-    echo "  --mongodb        Install MongoDB (Helm)"
+    echo "  --mongodb        Install MongoDB (Helm) [DISABLED]"
     echo "  --redpanda       Install Redpanda (Helm)"
     echo "  --node-exporter  Install Node Exporter (Monitoring)"
     echo "  --status         Show pods status"
