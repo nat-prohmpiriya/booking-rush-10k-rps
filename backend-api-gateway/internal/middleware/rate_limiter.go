@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -13,6 +14,16 @@ import (
 	"github.com/gin-gonic/gin"
 	pkgredis "github.com/prohmpiriya/booking-rush-10k-rps/pkg/redis"
 )
+
+// getEnvInt reads an integer from environment variable with a default value
+func getEnvInt(key string, defaultVal int) int {
+	if val := os.Getenv(key); val != "" {
+		if intVal, err := strconv.Atoi(val); err == nil {
+			return intVal
+		}
+	}
+	return defaultVal
+}
 
 // RateLimitConfig holds rate limiting configuration
 type RateLimitConfig struct {
@@ -409,38 +420,49 @@ func min(a, b float64) float64 {
 }
 
 // DefaultPerEndpointConfig returns sensible defaults for per-endpoint rate limiting
+// Reads from environment variables:
+// - RATE_LIMIT_REQUESTS_PER_MINUTE: default requests per minute (converted to per second)
+// - RATE_LIMIT_BURST: default burst size
+// - BOOKING_RATE_LIMIT_REQUESTS_PER_MINUTE: booking endpoint requests per minute
+// - BOOKING_RATE_LIMIT_BURST: booking endpoint burst size
 func DefaultPerEndpointConfig() PerEndpointRateLimitConfig {
+	// Read from ENV with defaults (convert per-minute to per-second)
+	defaultRPS := getEnvInt("RATE_LIMIT_REQUESTS_PER_MINUTE", 60000) / 60     // default 1000/s
+	defaultBurst := getEnvInt("RATE_LIMIT_BURST", 100)
+	bookingRPS := getEnvInt("BOOKING_RATE_LIMIT_REQUESTS_PER_MINUTE", 6000) / 60  // default 100/s
+	bookingBurst := getEnvInt("BOOKING_RATE_LIMIT_BURST", 20)
+
 	return PerEndpointRateLimitConfig{
 		Default: RateLimitConfig{
-			RequestsPerSecond: 1000,
-			BurstSize:         100,
+			RequestsPerSecond: defaultRPS,
+			BurstSize:         defaultBurst,
 		},
 		Endpoints: []EndpointRateLimitConfig{
-			// Critical booking endpoints - stricter limits
+			// Critical booking endpoints - configurable via ENV
 			{
 				PathPattern:       "/api/v1/bookings",
 				Methods:           []string{"POST"},
-				RequestsPerSecond: 100,
-				BurstSize:         20,
+				RequestsPerSecond: bookingRPS,
+				BurstSize:         bookingBurst,
 			},
 			{
 				PathPattern:       "/api/v1/bookings/*/confirm",
 				Methods:           []string{"POST"},
-				RequestsPerSecond: 50,
-				BurstSize:         10,
+				RequestsPerSecond: bookingRPS / 2, // half of booking rate
+				BurstSize:         bookingBurst / 2,
 			},
 			// Read-heavy endpoints - more generous limits
 			{
 				PathPattern:       "/api/v1/events",
 				Methods:           []string{"GET"},
-				RequestsPerSecond: 2000,
-				BurstSize:         200,
+				RequestsPerSecond: defaultRPS * 2,
+				BurstSize:         defaultBurst * 2,
 			},
 			{
 				PathPattern:       "/api/v1/events/*",
 				Methods:           []string{"GET"},
-				RequestsPerSecond: 2000,
-				BurstSize:         200,
+				RequestsPerSecond: defaultRPS * 2,
+				BurstSize:         defaultBurst * 2,
 			},
 			// Auth endpoints - moderate limits
 			{

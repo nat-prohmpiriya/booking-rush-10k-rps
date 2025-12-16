@@ -15,8 +15,12 @@ const insufficientSeatsErrors = new Counter('insufficient_seats_errors');
 const serverErrors = new Counter('server_errors');
 
 // Load test data from environment or use defaults
-const BASE_URL = __ENV.BASE_URL || 'http://localhost:8083';
-const AUTH_TOKEN = __ENV.AUTH_TOKEN || 'test-token';
+const BASE_URL = __ENV.BASE_URL || 'http://localhost:8080/api/v1';
+const AUTH_EMAIL = __ENV.AUTH_EMAIL || 'loadtest1@test.com';
+const AUTH_PASSWORD = __ENV.AUTH_PASSWORD || 'Test123!';
+
+// Token will be set during setup
+let AUTH_TOKEN = __ENV.AUTH_TOKEN || '';
 
 // Load test data from JSON file
 let testDataConfig;
@@ -46,8 +50,9 @@ const userIds = new SharedArray('user_ids', function () {
     return userIdsArray;
 });
 
-// Direct arrays for event and zone IDs (small enough to not need SharedArray)
+// Direct arrays for event, show, and zone IDs (small enough to not need SharedArray)
 const eventIds = testDataConfig.eventIds;
+const showIds = testDataConfig.showIds || [];
 const zoneIds = testDataConfig.zoneIds;
 
 // Test scenarios configuration
@@ -143,34 +148,39 @@ export const options = {
     },
 };
 
-// Default function - reserve seats
-export default function () {
-    reserveSeats();
+// Default function - reserve seats (receives data from setup)
+export default function (data) {
+    reserveSeats(data);
 }
 
-// Reserve seats function
-export function reserveSeats() {
+// Reserve seats function - receives data from setup()
+export function reserveSeats(data) {
+    // Get token from setup data
+    const token = data?.token || AUTH_TOKEN;
+
     // SharedArray must be accessed by index
     const userIndex = randomIntBetween(0, userIds.length - 1);
     const userId = userIds[userIndex];
     const eventId = randomItem(eventIds);
+    const showId = randomItem(showIds);
     const zoneId = randomItem(zoneIds);
     const quantity = randomIntBetween(1, 4);
-    const idempotencyKey = `${userId}-${eventId}-${Date.now()}-${randomIntBetween(1, 1000000)}`;
+    const idempotencyKey = `${userId}-${zoneId}-${Date.now()}-${randomIntBetween(1, 1000000)}`;
 
     const payload = JSON.stringify({
         event_id: eventId,
+        show_id: showId,
         zone_id: zoneId,
         quantity: quantity,
         unit_price: 100.00,
-        idempotency_key: idempotencyKey,
     });
 
     const params = {
         headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${AUTH_TOKEN}`,
+            'Authorization': `Bearer ${token}`,
             'X-User-ID': userId,
+            'X-Idempotency-Key': idempotencyKey,
         },
         tags: { name: 'ReserveSeats' },
     };
@@ -218,6 +228,31 @@ export function setup() {
     console.log(`Starting load test against ${BASE_URL}`);
     console.log(`Test data: ${eventIds.length} events, ${zoneIds.length} zones, ${userIds.length} users`);
 
+    // Login to get auth token if not provided via ENV
+    let token = AUTH_TOKEN;
+    if (!token) {
+        console.log(`Logging in as ${AUTH_EMAIL}...`);
+        const loginResponse = http.post(`${BASE_URL}/auth/login`, JSON.stringify({
+            email: AUTH_EMAIL,
+            password: AUTH_PASSWORD,
+        }), {
+            headers: { 'Content-Type': 'application/json' },
+            timeout: '10s',
+        });
+
+        if (loginResponse.status === 200) {
+            try {
+                const body = JSON.parse(loginResponse.body);
+                token = body.token || body.data?.token || body.access_token;
+                console.log(`Login successful, got token`);
+            } catch (e) {
+                console.error(`Failed to parse login response: ${e}`);
+            }
+        } else {
+            console.error(`Login failed: ${loginResponse.status} - ${loginResponse.body}`);
+        }
+    }
+
     // Verify API is reachable
     const healthCheck = http.get(`${BASE_URL}/health`, {
         timeout: '10s',
@@ -229,6 +264,7 @@ export function setup() {
 
     return {
         startTime: new Date().toISOString(),
+        token: token,
     };
 }
 

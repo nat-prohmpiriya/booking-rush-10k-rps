@@ -224,11 +224,31 @@ services:
     container_name: booking-rush-saga-payment-worker
     environment:
       - SERVICE_NAME=saga-payment-worker
-      - PAYMENT_GATEWAY=mock  # Override to use mock for saga testing
+      # Uses PAYMENT_GATEWAY from .env.local (stripe)
     env_file:
       - .env.local
     depends_on:
       - saga-orchestrator
+    restart: unless-stopped
+    networks:
+      - booking-rush-local
+
+  seat-release-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+      args:
+        SERVICE: backend-booking
+        WORKER: seat-release-worker
+    image: booking-rush/seat-release-worker:latest
+    container_name: booking-rush-seat-release-worker
+    environment:
+      - SERVICE_NAME=seat-release-worker
+    env_file:
+      - .env.local
+    depends_on:
+      booking:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - booking-rush-local
