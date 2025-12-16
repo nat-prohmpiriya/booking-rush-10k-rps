@@ -182,34 +182,45 @@ func (h *BookingHandler) Reserve(c *gin.Context) {
 
 ---
 
-## Phase 2: Supporting Services
+## Phase 2: Supporting Services ✅
 
-### 2.1 Auth Handlers - Add Spans
+### 2.1 Auth Handlers - Add Spans ✅
 
 **Files:**
-- [ ] `backend-auth/internal/handler/auth_handler.go`
-- [ ] `backend-auth/internal/handler/tenant_handler.go`
+- [x] `backend-auth/internal/handler/auth_handler.go`
+- [x] `backend-auth/internal/handler/tenant_handler.go`
 
-**Key methods:**
-- `Register()`, `Login()`, `RefreshToken()`
-- `CreateTenant()`, `GetTenant()`
+**Key methods instrumented:**
+- `Register()`, `Login()`, `RefreshToken()`, `Logout()`, `LogoutAll()`
+- `Me()`, `UpdateMe()`, `ValidateToken()`
+- `GetStripeCustomerID()`, `UpdateStripeCustomerID()`
+- `Create()`, `GetByID()`, `GetBySlug()`, `List()`, `Update()`, `Delete()` (Tenant)
 
 ---
 
-### 2.2 Auth Services - Add Spans
+### 2.2 Auth Services - Add Spans ✅
 
 **Files:**
-- [ ] `backend-auth/internal/service/auth_service.go`
-- [ ] `backend-auth/internal/service/tenant_service.go`
+- [x] `backend-auth/internal/service/auth_service.go`
+
+**Key methods instrumented:**
+- `Register()`, `Login()`, `RefreshToken()`, `Logout()`, `LogoutAll()`
+- `ValidateToken()`, `GetUser()`, `UpdateProfile()`
+- `GetStripeCustomerID()`, `UpdateStripeCustomerID()`
 
 ---
 
-### 2.3 Ticket Handlers - Add Spans
+### 2.3 Ticket Handlers - Add Spans ✅
 
 **Files:**
-- [ ] `backend-ticket/internal/handler/event_handler.go`
-- [ ] `backend-ticket/internal/handler/show_handler.go`
-- [ ] `backend-ticket/internal/handler/show_zone_handler.go`
+- [x] `backend-ticket/internal/handler/event_handler.go`
+- [x] `backend-ticket/internal/handler/show_handler.go`
+- [x] `backend-ticket/internal/handler/show_zone_handler.go`
+
+**Key methods instrumented:**
+- Event: `List()`, `GetBySlug()`, `GetByID()`, `ListMyEvents()`, `Create()`, `Update()`, `Delete()`, `Publish()`
+- Show: `ListByEvent()`, `Create()`, `GetByID()`, `Update()`, `Delete()`
+- ShowZone: `ListByShow()`, `Create()`, `GetByID()`, `Update()`, `Delete()`, `ListActive()`
 
 ---
 
@@ -223,11 +234,15 @@ func (h *BookingHandler) Reserve(c *gin.Context) {
 
 ---
 
-### 2.5 API Gateway - Add Spans
+### 2.5 API Gateway - Add Spans ✅
 
 **Files:**
-- [ ] `backend-api-gateway/internal/proxy/proxy.go`
-- [ ] `backend-api-gateway/internal/middleware/rate_limiter.go`
+- [x] `backend-api-gateway/internal/proxy/proxy.go`
+- [x] `backend-api-gateway/internal/middleware/rate_limiter.go`
+
+**Key functionality instrumented:**
+- Proxy: `Handler()` with target service, method, path attributes
+- Rate Limiter: `RateLimiter()`, `PerEndpointRateLimiter()` with client_ip, path, allowed attributes
 
 ---
 
@@ -348,4 +363,4 @@ After implementation, verify:
 
 ---
 
-Last Updated: 2025-12-16 (Phase 1 completed)
+Last Updated: 2025-12-16 (Phase 2 nearly completed - Ticket Services pending)

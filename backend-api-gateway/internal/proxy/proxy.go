@@ -15,6 +15,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	pkgmiddleware "github.com/prohmpiriya/booking-rush-10k-rps/pkg/middleware"
+	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/telemetry"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 )
 
 // ServiceConfig holds configuration for a backend service
@@ -163,8 +166,18 @@ func (rp *ReverseProxy) findRoute(path, method string) *RouteConfig {
 // Handler returns a Gin handler for proxying requests
 func (rp *ReverseProxy) Handler() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		ctx, span := telemetry.StartSpan(c.Request.Context(), "gateway.proxy")
+		defer span.End()
+		c.Request = c.Request.WithContext(ctx)
+
+		span.SetAttributes(
+			attribute.String("http.method", c.Request.Method),
+			attribute.String("http.path", c.Request.URL.Path),
+		)
+
 		route := rp.findRoute(c.Request.URL.Path, c.Request.Method)
 		if route == nil {
+			span.SetStatus(codes.Error, "No route configured for this path")
 			c.JSON(http.StatusNotFound, gin.H{
 				"success": false,
 				"error": gin.H{
@@ -176,12 +189,15 @@ func (rp *ReverseProxy) Handler() gin.HandlerFunc {
 			return
 		}
 
+		span.SetAttributes(attribute.String("target.service", route.Service.Name))
+
 		// Get proxy for this service
 		rp.mu.RLock()
 		proxy, exists := rp.proxies[route.Service.Name]
 		rp.mu.RUnlock()
 
 		if !exists {
+			span.SetStatus(codes.Error, "Backend service not configured")
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"success": false,
 				"error": gin.H{
@@ -225,9 +241,11 @@ func (rp *ReverseProxy) Handler() gin.HandlerFunc {
 		if timeout == 0 {
 			timeout = rp.config.DefaultTimeout
 		}
-		ctx, cancel := context.WithTimeout(c.Request.Context(), timeout)
+		timeoutCtx, cancel := context.WithTimeout(c.Request.Context(), timeout)
 		defer cancel()
-		c.Request = c.Request.WithContext(ctx)
+		c.Request = c.Request.WithContext(timeoutCtx)
+
+		span.SetStatus(codes.Ok, "")
 
 		// Proxy the request
 		proxy.ServeHTTP(c.Writer, c.Request)
