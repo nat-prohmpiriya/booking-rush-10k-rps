@@ -89,7 +89,7 @@ func (p *KafkaSagaProducer) SendCommand(ctx context.Context, command *SagaComman
 	}
 
 	if err := p.producer.ProduceJSON(ctx, topic, command.SagaID, command, headers); err != nil {
-		p.logger.Error("Failed to send saga command",
+		p.logger.ErrorContext(ctx, "Failed to send saga command",
 			"saga_id", command.SagaID,
 			"step_name", command.StepName,
 			"topic", topic,
@@ -97,7 +97,7 @@ func (p *KafkaSagaProducer) SendCommand(ctx context.Context, command *SagaComman
 		return fmt.Errorf("failed to send saga command: %w", err)
 	}
 
-	p.logger.Info("Saga command sent",
+	p.logger.InfoContext(ctx, "Saga command sent",
 		"saga_id", command.SagaID,
 		"step_name", command.StepName,
 		"topic", topic)
@@ -122,7 +122,7 @@ func (p *KafkaSagaProducer) SendCompensationCommand(ctx context.Context, command
 	}
 
 	if err := p.producer.ProduceJSON(ctx, topic, command.SagaID, command, headers); err != nil {
-		p.logger.Error("Failed to send compensation command",
+		p.logger.ErrorContext(ctx, "Failed to send compensation command",
 			"saga_id", command.SagaID,
 			"step_name", command.StepName,
 			"topic", topic,
@@ -130,7 +130,7 @@ func (p *KafkaSagaProducer) SendCompensationCommand(ctx context.Context, command
 		return fmt.Errorf("failed to send compensation command: %w", err)
 	}
 
-	p.logger.Info("Compensation command sent",
+	p.logger.InfoContext(ctx, "Compensation command sent",
 		"saga_id", command.SagaID,
 		"step_name", command.StepName,
 		"topic", topic,
@@ -173,7 +173,7 @@ func (p *KafkaSagaProducer) sendEvent(ctx context.Context, topic string, event *
 	}
 
 	if err := p.producer.ProduceJSON(ctx, topic, event.SagaID, event, headers); err != nil {
-		p.logger.Error("Failed to send saga event",
+		p.logger.ErrorContext(ctx, "Failed to send saga event",
 			"saga_id", event.SagaID,
 			"step_name", event.StepName,
 			"topic", topic,
@@ -182,7 +182,7 @@ func (p *KafkaSagaProducer) sendEvent(ctx context.Context, topic string, event *
 		return fmt.Errorf("failed to send saga event: %w", err)
 	}
 
-	p.logger.Info("Saga event sent",
+	p.logger.InfoContext(ctx, "Saga event sent",
 		"saga_id", event.SagaID,
 		"step_name", event.StepName,
 		"topic", topic,
@@ -219,7 +219,7 @@ func (p *KafkaSagaProducer) sendLifecycleEvent(ctx context.Context, topic string
 	}
 
 	if err := p.producer.ProduceJSON(ctx, topic, event.SagaID, event, headers); err != nil {
-		p.logger.Error("Failed to send saga lifecycle event",
+		p.logger.ErrorContext(ctx, "Failed to send saga lifecycle event",
 			"saga_id", event.SagaID,
 			"status", event.Status,
 			"topic", topic,
@@ -227,7 +227,7 @@ func (p *KafkaSagaProducer) sendLifecycleEvent(ctx context.Context, topic string
 		return fmt.Errorf("failed to send saga lifecycle event: %w", err)
 	}
 
-	p.logger.Info("Saga lifecycle event sent",
+	p.logger.InfoContext(ctx, "Saga lifecycle event sent",
 		"saga_id", event.SagaID,
 		"status", event.Status,
 		"topic", topic)
@@ -249,14 +249,14 @@ func (p *KafkaSagaProducer) ScheduleTimeoutCheck(ctx context.Context, check *Tim
 	}
 
 	if err := p.producer.ProduceJSON(ctx, topic, check.SagaID, check, headers); err != nil {
-		p.logger.Error("Failed to schedule timeout check",
+		p.logger.ErrorContext(ctx, "Failed to schedule timeout check",
 			"saga_id", check.SagaID,
 			"step_name", check.StepName,
 			"error", err)
 		return fmt.Errorf("failed to schedule timeout check: %w", err)
 	}
 
-	p.logger.Info("Timeout check scheduled",
+	p.logger.InfoContext(ctx, "Timeout check scheduled",
 		"saga_id", check.SagaID,
 		"step_name", check.StepName,
 		"timeout_at", check.TimeoutAt)
@@ -272,7 +272,7 @@ func (p *KafkaSagaProducer) Publish(ctx context.Context, topic string, key strin
 		Value: value,
 	}
 	if err := p.producer.Produce(ctx, msg); err != nil {
-		p.logger.Error("Failed to publish message",
+		p.logger.ErrorContext(ctx, "Failed to publish message",
 			"topic", topic,
 			"key", key,
 			"error", err)

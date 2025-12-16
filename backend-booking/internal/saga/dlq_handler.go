@@ -53,7 +53,7 @@ func NewDLQHandler(producer SagaProducer, store *pkgsaga.PostgresStore, logger L
 
 // HandleFailedMessage sends a failed message to the dead letter queue
 func (h *DLQHandler) HandleFailedMessage(ctx context.Context, originalTopic string, messageKey string, messageValue []byte, err error, retryCount int) error {
-	h.logger.Error(fmt.Sprintf("[ALERT] Message failed after %d retries, sending to DLQ", retryCount),
+	h.logger.ErrorContext(ctx, fmt.Sprintf("[ALERT] Message failed after %d retries, sending to DLQ", retryCount),
 		"topic", originalTopic,
 		"message_key", messageKey,
 		"error", err.Error())
@@ -95,7 +95,7 @@ func (h *DLQHandler) HandleFailedMessage(ctx context.Context, originalTopic stri
 			RetryCount:   retryCount,
 		}
 		if storeErr := h.store.SaveDeadLetter(ctx, deadLetter); storeErr != nil {
-			h.logger.Error("Failed to save dead letter to database",
+			h.logger.ErrorContext(ctx, "Failed to save dead letter to database",
 				"error", storeErr.Error())
 		}
 	}
@@ -104,19 +104,19 @@ func (h *DLQHandler) HandleFailedMessage(ctx context.Context, originalTopic stri
 	if h.producer != nil {
 		dlqMsgBytes, marshalErr := json.Marshal(dlqMsg)
 		if marshalErr != nil {
-			h.logger.Error("Failed to marshal DLQ message",
+			h.logger.ErrorContext(ctx, "Failed to marshal DLQ message",
 				"error", marshalErr.Error())
 			return marshalErr
 		}
 
 		if publishErr := h.producer.Publish(ctx, DLQTopic, messageKey, dlqMsgBytes); publishErr != nil {
-			h.logger.Error("Failed to publish to DLQ topic",
+			h.logger.ErrorContext(ctx, "Failed to publish to DLQ topic",
 				"error", publishErr.Error())
 			return publishErr
 		}
 	}
 
-	h.logger.Info("Message sent to DLQ",
+	h.logger.InfoContext(ctx, "Message sent to DLQ",
 		"saga_id", sagaID,
 		"original_topic", originalTopic)
 
@@ -205,7 +205,7 @@ func equalFoldAt(s, substr string, start int) bool {
 
 // RetryMessage attempts to retry a message from the DLQ
 func (h *DLQHandler) RetryMessage(ctx context.Context, dlqMsg *DLQMessage) error {
-	h.logger.Info("Retrying message from DLQ",
+	h.logger.InfoContext(ctx, "Retrying message from DLQ",
 		"saga_id", dlqMsg.SagaID,
 		"original_topic", dlqMsg.OriginalTopic)
 

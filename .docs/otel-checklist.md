@@ -15,7 +15,7 @@
 | Kafka Tracing | ✅ | Message-level |
 | Logger + Trace ID | ✅ | `WithContext()` พร้อมใช้ |
 | **Manual Spans** | ✅ | Handlers + Services done |
-| **Logger with Context** | ❌ | ต้องแก้ (มี 80+ calls ไม่ใช้ ctx) |
+| **Logger with Context** | ✅ | Saga handlers updated (80+ calls) |
 | **Business Metrics** | ❌ | ต้องสร้างใหม่ |
 
 ---
@@ -97,35 +97,42 @@ func (h *BookingHandler) Reserve(c *gin.Context) {
 
 ---
 
-### 1.4 Payment Services - Add Spans
+### 1.4 Payment Services - Add Spans ✅
 
 **Files:**
-- [ ] `backend-payment/internal/service/payment_service_impl.go`
+- [x] `backend-payment/internal/service/payment_service_impl.go`
 
-**Key methods:**
-- `ProcessPayment()` - critical
-- `RefundPayment()` - important
-- `HandleWebhook()` - important
+**Key methods instrumented:**
+- `CreatePayment()` - ✅
+- `ProcessPayment()` - ✅
+- `GetPayment()` - ✅
+- `GetPaymentByBookingID()` - ✅
+- `GetUserPayments()` - ✅
+- `RefundPayment()` - ✅
+- `CancelPayment()` - ✅
+- `CompletePaymentFromWebhook()` - ✅
+- `FailPaymentFromWebhook()` - ✅
 
 ---
 
-### 1.5 Saga Handlers - Fix Logger Context
+### 1.5 Saga Handlers - Fix Logger Context ✅
 
-**Files (80 logger calls total):**
-- [ ] `backend-booking/internal/saga/timeout_handler.go` (15 calls)
-- [ ] `backend-booking/internal/saga/dlq_handler.go` (6 calls)
-- [ ] `backend-booking/internal/saga/kafka_consumer.go` (14 calls)
-- [ ] `backend-booking/internal/saga/orchestrator_handler.go` (11 calls)
-- [ ] `backend-booking/internal/saga/payment_success_consumer.go` (3 calls)
-- [ ] `backend-booking/internal/saga/kafka_producer.go` (11 calls)
-- [ ] `backend-payment/internal/consumer/booking_consumer.go` (20 calls)
+**Files (80 logger calls updated):**
+- [x] `backend-booking/internal/saga/timeout_handler.go` (15 calls)
+- [x] `backend-booking/internal/saga/dlq_handler.go` (6 calls)
+- [x] `backend-booking/internal/saga/kafka_consumer.go` (14 calls)
+- [x] `backend-booking/internal/saga/orchestrator_handler.go` (11 calls)
+- [x] `backend-booking/internal/saga/payment_success_consumer.go` (3 calls)
+- [x] `backend-booking/internal/saga/kafka_producer.go` (11 calls)
+- [x] `backend-payment/internal/consumer/booking_consumer.go` (20 calls)
 
-**Tasks per file:**
-- [ ] Change `logger.Info(...)` → `logger.InfoContext(ctx, ...)`
-- [ ] Change `logger.Error(...)` → `logger.ErrorContext(ctx, ...)`
-- [ ] Change `logger.Warn(...)` → `logger.WarnContext(ctx, ...)`
-- [ ] Change `logger.Debug(...)` → `logger.DebugContext(ctx, ...)`
-- [ ] Ensure `ctx` is available (pass through from caller if needed)
+**Tasks completed:**
+- [x] Updated Logger interface in `backend-booking/internal/saga/types.go` with context methods
+- [x] Updated Logger interface in `pkg/saga/orchestrator.go` with context methods
+- [x] Added `ZapLogger` context methods in `backend-booking/internal/saga/orchestrator_handler.go`
+- [x] Changed `logger.Info(...)` → `logger.InfoContext(ctx, ...)` where ctx available
+- [x] Changed `logger.Error(...)` → `logger.ErrorContext(ctx, ...)` where ctx available
+- [x] Changed `logger.Warn(...)` → `logger.WarnContext(ctx, ...)` where ctx available
 
 ---
 
@@ -353,4 +360,4 @@ After implementation, verify:
 
 ---
 
-Last Updated: 2025-12-16
+Last Updated: 2025-12-16 (Phase 1.4, 1.5 completed)

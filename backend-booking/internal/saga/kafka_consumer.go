@@ -133,13 +133,13 @@ func (c *SagaConsumer) consumeLoop(ctx context.Context) {
 
 		records, err := c.consumer.Poll(ctx)
 		if err != nil {
-			c.logger.Error("Failed to poll records", "error", err)
+			c.logger.ErrorContext(ctx, "Failed to poll records", "error", err)
 			continue
 		}
 
 		for _, record := range records {
 			if err := c.handleRecord(ctx, record); err != nil {
-				c.logger.Error("Failed to handle record",
+				c.logger.ErrorContext(ctx, "Failed to handle record",
 					"topic", record.Topic,
 					"error", err)
 			}
@@ -147,7 +147,7 @@ func (c *SagaConsumer) consumeLoop(ctx context.Context) {
 
 		if len(records) > 0 {
 			if err := c.consumer.CommitRecords(ctx, records); err != nil {
-				c.logger.Error("Failed to commit records", "error", err)
+				c.logger.ErrorContext(ctx, "Failed to commit records", "error", err)
 			}
 		}
 	}
@@ -173,7 +173,7 @@ func (c *SagaConsumer) handleRecord(ctx context.Context, record *kafka.Record) e
 		return c.handleTimeoutCheck(ctx, record)
 
 	default:
-		c.logger.Warn("Unknown topic", "topic", topic)
+		c.logger.WarnContext(ctx, "Unknown topic", "topic", topic)
 		return nil
 	}
 }
@@ -184,7 +184,7 @@ func (c *SagaConsumer) handleSuccessEvent(ctx context.Context, record *kafka.Rec
 		return fmt.Errorf("failed to parse success event: %w", err)
 	}
 
-	c.logger.Info("Handling success event",
+	c.logger.InfoContext(ctx, "Handling success event",
 		"saga_id", event.SagaID,
 		"step_name", event.StepName)
 
@@ -203,7 +203,7 @@ func (c *SagaConsumer) handleFailureEvent(ctx context.Context, record *kafka.Rec
 		return fmt.Errorf("failed to parse failure event: %w", err)
 	}
 
-	c.logger.Info("Handling failure event",
+	c.logger.InfoContext(ctx, "Handling failure event",
 		"saga_id", event.SagaID,
 		"step_name", event.StepName,
 		"error", event.ErrorMessage)
@@ -237,7 +237,7 @@ func (c *SagaConsumer) handleTimeoutCheck(ctx context.Context, record *kafka.Rec
 		}
 	}
 
-	c.logger.Warn("Step timeout detected",
+	c.logger.WarnContext(ctx, "Step timeout detected",
 		"saga_id", check.SagaID,
 		"step_name", check.StepName)
 
@@ -297,7 +297,7 @@ func (c *SagaConsumer) advanceSaga(ctx context.Context, event *SagaEvent) error 
 					3,
 				)
 				if err := c.producer.ScheduleTimeoutCheck(ctx, timeoutCheck); err != nil {
-					c.logger.Warn("Failed to schedule timeout check", "error", err)
+					c.logger.WarnContext(ctx, "Failed to schedule timeout check", "error", err)
 				}
 			} else {
 				// Saga completed
@@ -314,7 +314,7 @@ func (c *SagaConsumer) advanceSaga(ctx context.Context, event *SagaEvent) error 
 					instance.CreatedAt,
 				)
 				if err := c.producer.SendSagaCompletedEvent(ctx, completedEvent); err != nil {
-					c.logger.Warn("Failed to send saga completed event", "error", err)
+					c.logger.WarnContext(ctx, "Failed to send saga completed event", "error", err)
 				}
 			}
 		}
@@ -344,7 +344,7 @@ func (c *SagaConsumer) triggerCompensation(ctx context.Context, event *SagaEvent
 		instance.CreatedAt,
 	)
 	if err := c.producer.SendSagaFailedEvent(ctx, failedEvent); err != nil {
-		c.logger.Warn("Failed to send saga failed event", "error", err)
+		c.logger.WarnContext(ctx, "Failed to send saga failed event", "error", err)
 	}
 
 	// Send compensation commands for completed steps in reverse order
@@ -370,7 +370,7 @@ func (c *SagaConsumer) triggerCompensation(ctx context.Context, event *SagaEvent
 		)
 
 		if err := c.producer.SendCompensationCommand(ctx, command); err != nil {
-			c.logger.Error("Failed to send compensation command",
+			c.logger.ErrorContext(ctx, "Failed to send compensation command",
 				"saga_id", instance.ID,
 				"step_name", stepName,
 				"error", err)
@@ -381,7 +381,7 @@ func (c *SagaConsumer) triggerCompensation(ctx context.Context, event *SagaEvent
 }
 
 func (c *SagaConsumer) handleStepTimeout(ctx context.Context, check *TimeoutCheck, instance *pkgsaga.Instance) error {
-	c.logger.Error("Step timed out, triggering compensation",
+	c.logger.ErrorContext(ctx, "Step timed out, triggering compensation",
 		"saga_id", check.SagaID,
 		"step_name", check.StepName)
 
