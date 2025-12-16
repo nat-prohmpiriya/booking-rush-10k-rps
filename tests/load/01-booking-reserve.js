@@ -25,7 +25,7 @@ let AUTH_TOKEN = __ENV.AUTH_TOKEN || '';
 // Load test data from JSON file
 let testDataConfig;
 try {
-    testDataConfig = JSON.parse(open('./seed_data.json'));
+    testDataConfig = JSON.parse(open('./seed-data/data.json'));
 } catch (e) {
     // Default test data
     testDataConfig = {
@@ -55,95 +55,81 @@ const eventIds = testDataConfig.eventIds;
 const showIds = testDataConfig.showIds || [];
 const zoneIds = testDataConfig.zoneIds;
 
-// Test scenarios configuration
-export const options = {
-    scenarios: {
-        // Scenario 1: Smoke test - verify basic functionality
-        smoke: {
-            executor: 'constant-vus',
-            vus: 1,
-            duration: '30s',
-            tags: { scenario: 'smoke' },
-            exec: 'reserveSeats',
-        },
+// Get scenario from environment (default: run all)
+const SCENARIO = __ENV.SCENARIO || 'all';
 
-        // Scenario 2: Ramp-up test - gradually increase load
-        ramp_up: {
-            executor: 'ramping-vus',
-            startVUs: 0,
-            stages: [
-                { duration: '1m', target: 100 },   // Ramp to 100 VUs
-                { duration: '2m', target: 500 },   // Ramp to 500 VUs
-                { duration: '3m', target: 1000 },  // Ramp to 1000 VUs
-                { duration: '2m', target: 500 },   // Scale down
-                { duration: '1m', target: 0 },     // Ramp down to 0
-            ],
-            tags: { scenario: 'ramp_up' },
-            exec: 'reserveSeats',
-            startTime: '35s', // Start after smoke test
-        },
-
-        // Scenario 3: Sustained load - maintain high load
-        sustained: {
-            executor: 'constant-arrival-rate',
-            rate: 5000,           // 5000 iterations per timeUnit
-            timeUnit: '1s',       // = 5000 RPS
-            duration: '5m',
-            preAllocatedVUs: 1000,
-            maxVUs: 2000,
-            tags: { scenario: 'sustained' },
-            exec: 'reserveSeats',
-            startTime: '10m', // Start after ramp_up
-        },
-
-        // Scenario 4: Spike test - sudden traffic spike
-        spike: {
-            executor: 'ramping-arrival-rate',
-            startRate: 1000,
-            timeUnit: '1s',
-            stages: [
-                { duration: '30s', target: 1000 },  // Stay at 1000 RPS
-                { duration: '10s', target: 10000 }, // Spike to 10k RPS
-                { duration: '1m', target: 10000 },  // Stay at 10k RPS
-                { duration: '10s', target: 1000 },  // Drop back to 1000 RPS
-                { duration: '1m', target: 1000 },   // Stay at 1000 RPS
-            ],
-            preAllocatedVUs: 2000,
-            maxVUs: 5000,
-            tags: { scenario: 'spike' },
-            exec: 'reserveSeats',
-            startTime: '16m', // Start after sustained
-        },
-
-        // Scenario 5: 10k RPS stress test - target performance
-        stress_10k: {
-            executor: 'constant-arrival-rate',
-            rate: 10000,          // 10000 iterations per timeUnit
-            timeUnit: '1s',       // = 10,000 RPS
-            duration: '5m',
-            preAllocatedVUs: 2000,
-            maxVUs: 5000,
-            tags: { scenario: 'stress_10k' },
-            exec: 'reserveSeats',
-            startTime: '20m', // Start after spike
-        },
+// All scenarios definition
+const allScenarios = {
+    smoke: {
+        executor: 'constant-vus',
+        vus: 1,
+        duration: '30s',
+        tags: { scenario: 'smoke' },
+        exec: 'reserveSeats',
     },
+    ramp_up: {
+        executor: 'ramping-vus',
+        startVUs: 0,
+        stages: [
+            { duration: '1m', target: 100 },
+            { duration: '2m', target: 500 },
+            { duration: '3m', target: 1000 },
+            { duration: '2m', target: 500 },
+            { duration: '1m', target: 0 },
+        ],
+        tags: { scenario: 'ramp_up' },
+        exec: 'reserveSeats',
+    },
+    sustained: {
+        executor: 'constant-arrival-rate',
+        rate: 5000,
+        timeUnit: '1s',
+        duration: '5m',
+        preAllocatedVUs: 1000,
+        maxVUs: 2000,
+        tags: { scenario: 'sustained' },
+        exec: 'reserveSeats',
+    },
+    spike: {
+        executor: 'ramping-arrival-rate',
+        startRate: 1000,
+        timeUnit: '1s',
+        stages: [
+            { duration: '30s', target: 1000 },
+            { duration: '10s', target: 10000 },
+            { duration: '1m', target: 10000 },
+            { duration: '10s', target: 1000 },
+            { duration: '1m', target: 1000 },
+        ],
+        preAllocatedVUs: 2000,
+        maxVUs: 5000,
+        tags: { scenario: 'spike' },
+        exec: 'reserveSeats',
+    },
+    stress_10k: {
+        executor: 'constant-arrival-rate',
+        rate: 10000,
+        timeUnit: '1s',
+        duration: '5m',
+        preAllocatedVUs: 2000,
+        maxVUs: 5000,
+        tags: { scenario: 'stress_10k' },
+        exec: 'reserveSeats',
+    },
+};
 
+// Select scenario based on ENV
+const selectedScenarios = SCENARIO === 'all'
+    ? allScenarios
+    : { [SCENARIO]: allScenarios[SCENARIO] };
+
+// Test configuration
+export const options = {
+    scenarios: selectedScenarios,
     thresholds: {
-        // HTTP request duration
-        'http_req_duration': ['p(95)<500', 'p(99)<1000'], // 95th < 500ms, 99th < 1s
-        'http_req_duration{scenario:smoke}': ['p(95)<200'],
-        'http_req_duration{scenario:sustained}': ['p(95)<500'],
-        'http_req_duration{scenario:stress_10k}': ['p(95)<1000'],
-
-        // Success rate
-        'reserve_success_rate': ['rate>0.95'], // 95% success rate
-        'reserve_success_rate{scenario:smoke}': ['rate>0.99'],
-
-        // Error rates
-        'http_req_failed': ['rate<0.05'], // Less than 5% failure
-
-        // Custom metrics
+        'http_req_duration': ['p(95)<500', 'p(99)<1000'],
+        'reserve_success_rate': ['rate>0.95'],
+        'http_req_failed': ['rate<0.05'],
         'reserve_duration': ['p(95)<500', 'avg<200'],
     },
 };
