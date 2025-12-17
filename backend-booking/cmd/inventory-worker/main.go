@@ -41,16 +41,16 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Initialize database connection (uses BookingDatabase - Microservice pattern)
+	// Initialize database connection (uses TicketDatabase - seat_zones table is in ticket_db)
 	dbCfg := &database.PostgresConfig{
-		Host:          cfg.BookingDatabase.Host,
-		Port:          cfg.BookingDatabase.Port,
-		User:          cfg.BookingDatabase.User,
-		Password:      cfg.BookingDatabase.Password,
-		Database:      cfg.BookingDatabase.DBName,
-		SSLMode:       cfg.BookingDatabase.SSLMode,
-		MaxConns:      int32(cfg.BookingDatabase.MaxOpenConns),
-		MinConns:      int32(cfg.BookingDatabase.MaxIdleConns),
+		Host:          cfg.TicketDatabase.Host,
+		Port:          cfg.TicketDatabase.Port,
+		User:          cfg.TicketDatabase.User,
+		Password:      cfg.TicketDatabase.Password,
+		Database:      cfg.TicketDatabase.DBName,
+		SSLMode:       cfg.TicketDatabase.SSLMode,
+		MaxConns:      int32(cfg.TicketDatabase.MaxOpenConns),
+		MinConns:      int32(cfg.TicketDatabase.MaxIdleConns),
 		MaxRetries:    3,
 		RetryInterval: 2 * time.Second,
 	}
