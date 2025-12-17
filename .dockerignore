@@ -1,0 +1,52 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Dependencies (will be downloaded in container)
+**/node_modules
+**/vendor
+
+# Test results (can be huge!)
+tests/load/results/
+**/coverage/
+
+# Build artifacts
+**/bin/
+**/dist/
+**/build/
+**/*.exe
+**/*.dll
+**/*.so
+**/*.dylib
+
+# Temp files
+**/tmp/
+**/*.tmp
+**/*.log
+
+# Documentation
+*.md
+!README.md
+.docs/
+
+# Screenshots
+*.png
+*.jpg
+*.jpeg
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Frontend build cache
+frontend-web/.next/
+frontend-web/out/
+
+# Go cache (handled by go mod)
+go-guides/

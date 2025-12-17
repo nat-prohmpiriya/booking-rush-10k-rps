@@ -1,0 +1,275 @@
+# Docker Compose for Load Testing (1 instance, no nginx)
+# Best performance config: 1,816 RPS, 0% errors
+# Usage: docker-compose -f docker-compose.k6-1instance.yml up --build
+
+services:
+  api-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE: backend-api-gateway
+    image: booking-rush/api-gateway:prod
+    container_name: booking-rush-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - SERVER_PORT=8080
+    env_file:
+      - .env.local
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    depends_on:
+      auth:
+        condition: service_healthy
+      ticket:
+        condition: service_healthy
+      booking:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - booking-rush-local
+
+  auth:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE: backend-auth
+    image: booking-rush/auth:prod
+    container_name: booking-rush-auth
+    ports:
+      - "8081:8081"
+    environment:
+      - SERVER_PORT=8081
+    env_file:
+      - .env.local
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8081/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - booking-rush-local
+
+  ticket:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE: backend-ticket
+    image: booking-rush/ticket:prod
+    container_name: booking-rush-ticket
+    ports:
+      - "8082:8082"
+    environment:
+      - SERVER_PORT=8082
+    env_file:
+      - .env.local
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8082/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - booking-rush-local
+
+  booking:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE: backend-booking
+    image: booking-rush/booking:prod
+    container_name: booking-rush-booking
+    ports:
+      - "8083:8083"
+      - "9083:9083"  # pprof
+    environment:
+      - SERVER_PORT=8083
+    env_file:
+      - .env.local
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8083/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+    networks:
+      - booking-rush-local
+
+  payment:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE: backend-payment
+    image: booking-rush/payment:prod
+    container_name: booking-rush-payment
+    ports:
+      - "8084:8084"
+    environment:
+      - SERVER_PORT=8084
+    env_file:
+      - .env.local
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8084/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - booking-rush-local
+
+  frontend:
+    build:
+      context: ./frontend-web
+      dockerfile: Dockerfile
+    image: booking-rush/frontend:prod
+    container_name: booking-rush-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8080/api/v1
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - booking-rush-local
+
+  # ============================================
+  # Workers
+  # ============================================
+
+  inventory-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+      args:
+        SERVICE: backend-booking
+        WORKER: inventory-worker
+    image: booking-rush/inventory-worker:prod
+    container_name: booking-rush-inventory-worker
+    environment:
+      - SERVICE_NAME=inventory-worker
+    env_file:
+      - .env.local
+    depends_on:
+      booking:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - booking-rush-local
+
+  queue-release-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+      args:
+        SERVICE: backend-booking
+        WORKER: queue-worker
+    image: booking-rush/queue-release-worker:prod
+    container_name: booking-rush-queue-release-worker
+    environment:
+      - SERVICE_NAME=queue-release-worker
+    env_file:
+      - .env.local
+    depends_on:
+      booking:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - booking-rush-local
+
+  saga-orchestrator:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+      args:
+        SERVICE: backend-booking
+        WORKER: saga-orchestrator
+    image: booking-rush/saga-orchestrator:prod
+    container_name: booking-rush-saga-orchestrator
+    environment:
+      - SERVICE_NAME=saga-orchestrator
+    env_file:
+      - .env.local
+    depends_on:
+      booking:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - booking-rush-local
+
+  saga-step-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+      args:
+        SERVICE: backend-booking
+        WORKER: saga-step-worker
+    image: booking-rush/saga-step-worker:prod
+    container_name: booking-rush-saga-step-worker
+    environment:
+      - SERVICE_NAME=saga-step-worker
+    env_file:
+      - .env.local
+    depends_on:
+      - saga-orchestrator
+    restart: unless-stopped
+    networks:
+      - booking-rush-local
+
+  saga-payment-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+      args:
+        SERVICE: backend-payment
+        WORKER: saga-payment-worker
+    image: booking-rush/saga-payment-worker:prod
+    container_name: booking-rush-saga-payment-worker
+    environment:
+      - SERVICE_NAME=saga-payment-worker
+    env_file:
+      - .env.local
+    depends_on:
+      - saga-orchestrator
+    restart: unless-stopped
+    networks:
+      - booking-rush-local
+
+  seat-release-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+      args:
+        SERVICE: backend-booking
+        WORKER: seat-release-worker
+    image: booking-rush/seat-release-worker:prod
+    container_name: booking-rush-seat-release-worker
+    environment:
+      - SERVICE_NAME=seat-release-worker
+    env_file:
+      - .env.local
+    depends_on:
+      booking:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - booking-rush-local
+
+networks:
+  booking-rush-local:
+    external: true
