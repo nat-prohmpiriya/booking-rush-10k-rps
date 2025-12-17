@@ -14,6 +14,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking/internal/di"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking/internal/handler"
 	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking/internal/repository"
 	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking/internal/saga"
 	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking/internal/service"
@@ -129,6 +130,7 @@ func main() {
 		Topic:       "booking-events",
 		ServiceName: "booking-service",
 		ClientID:    cfg.Kafka.ClientID,
+		Logger:      service.NewZapLoggerAdapter(appLog),
 	}
 	eventPublisher, err = service.NewKafkaEventPublisher(ctx, eventPubCfg)
 	if err != nil {
@@ -193,6 +195,10 @@ func main() {
 	}
 	appLog.Info(fmt.Sprintf("Booking config: MaxPerUser=%d, ReservationTTL=%v", maxPerUser, reservationTTL))
 
+	// Log queue pass requirement setting
+	requireQueuePass := cfg.Booking.RequireQueuePass
+	appLog.Info(fmt.Sprintf("Virtual Queue: RequireQueuePass=%v", requireQueuePass))
+
 	container := di.NewContainer(&di.ContainerConfig{
 		DB:              db,
 		Redis:           redisClient,
@@ -216,6 +222,9 @@ func main() {
 		SagaServiceConfig: &service.SagaServiceConfig{
 			StepTimeout: 30 * time.Second,
 			MaxRetries:  2,
+		},
+		BookingHandlerConfig: &handler.BookingHandlerConfig{
+			RequireQueuePass: requireQueuePass,
 		},
 	})
 

@@ -27,8 +27,9 @@ type Config struct {
 
 // BookingServiceConfig holds booking service specific settings
 type BookingServiceConfig struct {
-	MaxTicketsPerUser     int `mapstructure:"max_tickets_per_user"`      // Maximum tickets per user per event (0 = unlimited)
-	ReservationTTLMinutes int `mapstructure:"reservation_ttl_minutes"`   // Reservation TTL in minutes
+	MaxTicketsPerUser     int  `mapstructure:"max_tickets_per_user"`    // Maximum tickets per user per event (0 = unlimited)
+	ReservationTTLMinutes int  `mapstructure:"reservation_ttl_minutes"` // Reservation TTL in minutes
+	RequireQueuePass      bool `mapstructure:"require_queue_pass"`      // Require queue pass for booking (virtual queue enforcement)
 }
 
 // ServicesConfig holds URLs of other microservices
@@ -293,6 +294,7 @@ func setDefaults(v *viper.Viper) {
 	// Booking service defaults
 	v.SetDefault("MAX_TICKETS_PER_USER", 10)        // Default 10 tickets per user per event
 	v.SetDefault("RESERVATION_TTL_MINUTES", 10)    // Default 10 minutes reservation TTL
+	v.SetDefault("REQUIRE_QUEUE_PASS", false)      // Default: don't require queue pass (for backward compatibility)
 }
 
 func bindConfig(v *viper.Viper, cfg *Config) error {
@@ -398,6 +400,7 @@ func bindConfig(v *viper.Viper, cfg *Config) error {
 	// Booking service config
 	cfg.Booking.MaxTicketsPerUser = v.GetInt("MAX_TICKETS_PER_USER")
 	cfg.Booking.ReservationTTLMinutes = v.GetInt("RESERVATION_TTL_MINUTES")
+	cfg.Booking.RequireQueuePass = v.GetBool("REQUIRE_QUEUE_PASS")
 
 	return nil
 }

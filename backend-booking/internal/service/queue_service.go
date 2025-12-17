@@ -30,6 +30,12 @@ type QueueService interface {
 
 	// GetQueueStatus gets the queue status for an event
 	GetQueueStatus(ctx context.Context, eventID string) (*dto.QueueStatusResponse, error)
+
+	// ValidateQueuePass validates the queue pass JWT and checks Redis
+	ValidateQueuePass(ctx context.Context, userID, eventID, queuePass string) error
+
+	// DeleteQueuePass removes the queue pass after successful booking
+	DeleteQueuePass(ctx context.Context, userID, eventID string) error
 }
 
 // queueService implements QueueService
@@ -374,4 +380,92 @@ func (s *queueService) generateQueuePass(userID, eventID string) (string, time.T
 	}
 
 	return signedToken, expiresAt, nil
+}
+
+// ValidateQueuePass validates the queue pass JWT and checks Redis
+func (s *queueService) ValidateQueuePass(ctx context.Context, userID, eventID, queuePass string) error {
+	ctx, span := telemetry.StartSpan(ctx, "service.queue.validate_pass")
+	defer span.End()
+
+	span.SetAttributes(
+		attribute.String("user_id", userID),
+		attribute.String("event_id", eventID),
+	)
+
+	if queuePass == "" {
+		span.SetStatus(codes.Error, "queue pass required")
+		return domain.ErrQueuePassRequired
+	}
+
+	// Parse and validate JWT
+	token, err := jwt.ParseWithClaims(queuePass, &QueuePassClaims{}, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return []byte(s.jwtSecret), nil
+	})
+
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "invalid queue pass")
+		return domain.ErrInvalidQueuePass
+	}
+
+	claims, ok := token.Claims.(*QueuePassClaims)
+	if !ok || !token.Valid {
+		span.SetStatus(codes.Error, "invalid queue pass claims")
+		return domain.ErrInvalidQueuePass
+	}
+
+	// Verify claims match
+	if claims.UserID != userID {
+		span.SetStatus(codes.Error, "queue pass user mismatch")
+		return domain.ErrQueuePassUserMismatch
+	}
+
+	if claims.EventID != eventID {
+		span.SetStatus(codes.Error, "queue pass event mismatch")
+		return domain.ErrQueuePassEventMismatch
+	}
+
+	if claims.Purpose != "queue_pass" {
+		span.SetStatus(codes.Error, "invalid queue pass purpose")
+		return domain.ErrInvalidQueuePass
+	}
+
+	// Validate against Redis (check if not already used/expired)
+	valid, err := s.queueRepo.ValidateQueuePass(ctx, eventID, userID, queuePass)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "failed to validate queue pass in redis")
+		return fmt.Errorf("failed to validate queue pass: %w", err)
+	}
+
+	if !valid {
+		span.SetStatus(codes.Error, "queue pass not found or expired")
+		return domain.ErrQueuePassExpired
+	}
+
+	span.SetStatus(codes.Ok, "")
+	return nil
+}
+
+// DeleteQueuePass removes the queue pass after successful booking
+func (s *queueService) DeleteQueuePass(ctx context.Context, userID, eventID string) error {
+	ctx, span := telemetry.StartSpan(ctx, "service.queue.delete_pass")
+	defer span.End()
+
+	span.SetAttributes(
+		attribute.String("user_id", userID),
+		attribute.String("event_id", eventID),
+	)
+
+	if err := s.queueRepo.DeleteQueuePass(ctx, eventID, userID); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return err
+	}
+
+	span.SetStatus(codes.Ok, "")
+	return nil
 }

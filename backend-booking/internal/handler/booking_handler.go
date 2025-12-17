@@ -18,13 +18,26 @@ import (
 // Uses fast path (Redis Lua + PostgreSQL) for all reservations
 // Saga is triggered asynchronously after payment success via webhook
 type BookingHandler struct {
-	bookingService service.BookingService
+	bookingService   service.BookingService
+	queueService     service.QueueService
+	requireQueuePass bool
+}
+
+// BookingHandlerConfig contains configuration for booking handler
+type BookingHandlerConfig struct {
+	RequireQueuePass bool
 }
 
 // NewBookingHandler creates a new booking handler
-func NewBookingHandler(bookingService service.BookingService) *BookingHandler {
+func NewBookingHandler(bookingService service.BookingService, queueService service.QueueService, cfg *BookingHandlerConfig) *BookingHandler {
+	requireQueuePass := false
+	if cfg != nil {
+		requireQueuePass = cfg.RequireQueuePass
+	}
 	return &BookingHandler{
-		bookingService: bookingService,
+		bookingService:   bookingService,
+		queueService:     queueService,
+		requireQueuePass: requireQueuePass,
 	}
 }
 
@@ -70,7 +83,19 @@ func (h *BookingHandler) ReserveSeats(c *gin.Context) {
 		attribute.String("zone_id", req.ZoneID),
 		attribute.String("show_id", req.ShowID),
 		attribute.Int("quantity", req.Quantity),
+		attribute.Bool("require_queue_pass", h.requireQueuePass),
 	)
+
+	// Validate queue pass if required
+	if h.requireQueuePass {
+		if err := h.queueService.ValidateQueuePass(ctx, userID, req.EventID, req.QueuePass); err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
+			h.handleError(c, err)
+			return
+		}
+		span.SetAttributes(attribute.Bool("queue_pass_valid", true))
+	}
 
 	// Fast path: Redis Lua (atomic) + PostgreSQL
 	result, err := h.bookingService.ReserveSeats(ctx, userID, &req)
@@ -79,6 +104,14 @@ func (h *BookingHandler) ReserveSeats(c *gin.Context) {
 		span.SetStatus(codes.Error, err.Error())
 		h.handleError(c, err)
 		return
+	}
+
+	// Delete queue pass after successful reservation (one-time use)
+	if h.requireQueuePass && h.queueService != nil {
+		// Run in background - don't block the response
+		go func() {
+			_ = h.queueService.DeleteQueuePass(ctx, userID, req.EventID)
+		}()
 	}
 
 	span.SetAttributes(attribute.String("booking_id", result.BookingID))
@@ -439,6 +472,30 @@ func (h *BookingHandler) handleError(c *gin.Context, err error) {
 		c.JSON(http.StatusGone, dto.ErrorResponse{
 			Error: err.Error(),
 			Code:  "EXPIRED",
+		})
+	// Queue pass errors
+	case errors.Is(err, domain.ErrQueuePassRequired):
+		c.JSON(http.StatusForbidden, dto.ErrorResponse{
+			Error:   err.Error(),
+			Code:    "QUEUE_PASS_REQUIRED",
+			Message: "Please join the queue and wait for your turn to book",
+		})
+	case errors.Is(err, domain.ErrInvalidQueuePass):
+		c.JSON(http.StatusForbidden, dto.ErrorResponse{
+			Error: err.Error(),
+			Code:  "INVALID_QUEUE_PASS",
+		})
+	case errors.Is(err, domain.ErrQueuePassExpired):
+		c.JSON(http.StatusForbidden, dto.ErrorResponse{
+			Error:   err.Error(),
+			Code:    "QUEUE_PASS_EXPIRED",
+			Message: "Your queue pass has expired. Please rejoin the queue.",
+		})
+	case errors.Is(err, domain.ErrQueuePassUserMismatch),
+		errors.Is(err, domain.ErrQueuePassEventMismatch):
+		c.JSON(http.StatusForbidden, dto.ErrorResponse{
+			Error: err.Error(),
+			Code:  "QUEUE_PASS_MISMATCH",
 		})
 	default:
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
