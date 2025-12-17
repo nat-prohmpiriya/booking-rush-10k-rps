@@ -6,6 +6,7 @@ import (
 	"time"
 
 	pkgsaga "github.com/prohmpiriya/booking-rush-10k-rps/pkg/saga"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // OrchestratorEventHandler handles saga events and advances the saga
@@ -32,7 +33,7 @@ func NewOrchestratorEventHandler(
 
 // HandleStepSuccess handles a successful step completion
 func (h *OrchestratorEventHandler) HandleStepSuccess(ctx context.Context, event *SagaEvent) error {
-	h.logger.Info("Handling step success",
+	h.logger.InfoContext(ctx, "Handling step success",
 		"saga_id", event.SagaID,
 		"step_name", event.StepName,
 		"step_index", event.StepIndex)
@@ -44,7 +45,7 @@ func (h *OrchestratorEventHandler) HandleStepSuccess(ctx context.Context, event 
 	}
 
 	if instance == nil {
-		h.logger.Warn("Saga instance not found", "saga_id", event.SagaID)
+		h.logger.WarnContext(ctx, "Saga instance not found", "saga_id", event.SagaID)
 		return nil
 	}
 
@@ -93,7 +94,7 @@ func (h *OrchestratorEventHandler) HandleStepSuccess(ctx context.Context, event 
 		return fmt.Errorf("failed to send next step command: %w", err)
 	}
 
-	h.logger.Info("Sent next step command",
+	h.logger.InfoContext(ctx, "Sent next step command",
 		"saga_id", event.SagaID,
 		"next_step", nextStepName)
 
@@ -102,7 +103,7 @@ func (h *OrchestratorEventHandler) HandleStepSuccess(ctx context.Context, event 
 
 // HandleStepFailure handles a failed step
 func (h *OrchestratorEventHandler) HandleStepFailure(ctx context.Context, event *SagaEvent) error {
-	h.logger.Error("Handling step failure",
+	h.logger.ErrorContext(ctx, "Handling step failure",
 		"saga_id", event.SagaID,
 		"step_name", event.StepName,
 		"error", event.ErrorMessage)
@@ -114,7 +115,7 @@ func (h *OrchestratorEventHandler) HandleStepFailure(ctx context.Context, event 
 	}
 
 	if instance == nil {
-		h.logger.Warn("Saga instance not found", "saga_id", event.SagaID)
+		h.logger.WarnContext(ctx, "Saga instance not found", "saga_id", event.SagaID)
 		return nil
 	}
 
@@ -142,7 +143,7 @@ func (h *OrchestratorEventHandler) HandleStepFailure(ctx context.Context, event 
 
 // HandleTimeout handles a step timeout
 func (h *OrchestratorEventHandler) HandleTimeout(ctx context.Context, check *TimeoutCheck) error {
-	h.logger.Warn("Handling step timeout",
+	h.logger.WarnContext(ctx, "Handling step timeout",
 		"saga_id", check.SagaID,
 		"step_name", check.StepName)
 
@@ -215,12 +216,12 @@ func (h *OrchestratorEventHandler) startCompensation(ctx context.Context, instan
 		)
 
 		if err := h.producer.SendCompensationCommand(ctx, command); err != nil {
-			h.logger.Error("Failed to send compensation command",
+			h.logger.ErrorContext(ctx, "Failed to send compensation command",
 				"saga_id", instance.ID,
 				"step_name", stepName,
 				"error", err)
 		} else {
-			h.logger.Info("Sent compensation command",
+			h.logger.InfoContext(ctx, "Sent compensation command",
 				"saga_id", instance.ID,
 				"step_name", stepName)
 		}
@@ -243,7 +244,7 @@ func (h *OrchestratorEventHandler) startCompensation(ctx context.Context, instan
 		instance.CreatedAt,
 	)
 	if err := h.producer.SendSagaCompensatedEvent(ctx, compensatedEvent); err != nil {
-		h.logger.Warn("Failed to send saga compensated event", "error", err)
+		h.logger.WarnContext(ctx, "Failed to send saga compensated event", "error", err)
 	}
 
 	return nil
@@ -265,10 +266,10 @@ func (h *OrchestratorEventHandler) completeSaga(ctx context.Context, instance *p
 		instance.CreatedAt,
 	)
 	if err := h.producer.SendSagaCompletedEvent(ctx, completedEvent); err != nil {
-		h.logger.Warn("Failed to send saga completed event", "error", err)
+		h.logger.WarnContext(ctx, "Failed to send saga completed event", "error", err)
 	}
 
-	h.logger.Info("Saga completed successfully", "saga_id", instance.ID)
+	h.logger.InfoContext(ctx, "Saga completed successfully", "saga_id", instance.ID)
 
 	return nil
 }
@@ -327,6 +328,27 @@ func (l *ZapLogger) Error(msg string, fields ...interface{}) {
 	}
 }
 
+func (l *ZapLogger) InfoContext(ctx context.Context, msg string, fields ...interface{}) {
+	log := getLogger()
+	if log != nil {
+		log.Info(formatLogMessageWithContext(ctx, msg, fields...))
+	}
+}
+
+func (l *ZapLogger) WarnContext(ctx context.Context, msg string, fields ...interface{}) {
+	log := getLogger()
+	if log != nil {
+		log.Warn(formatLogMessageWithContext(ctx, msg, fields...))
+	}
+}
+
+func (l *ZapLogger) ErrorContext(ctx context.Context, msg string, fields ...interface{}) {
+	log := getLogger()
+	if log != nil {
+		log.Error(formatLogMessageWithContext(ctx, msg, fields...))
+	}
+}
+
 func getLogger() interface{ Info(string); Warn(string); Error(string) } {
 	// Import cycle prevention - use simple fmt for now
 	return &simpleLogger{}
@@ -343,4 +365,20 @@ func formatLogMessage(msg string, fields ...interface{}) string {
 		return msg
 	}
 	return fmt.Sprintf("%s %v", msg, fields)
+}
+
+func formatLogMessageWithContext(ctx context.Context, msg string, fields ...interface{}) string {
+	traceID := ""
+	spanCtx := trace.SpanContextFromContext(ctx)
+	if spanCtx.HasTraceID() {
+		traceID = spanCtx.TraceID().String()
+	}
+
+	if traceID != "" {
+		if len(fields) == 0 {
+			return fmt.Sprintf("%s [trace_id=%s]", msg, traceID)
+		}
+		return fmt.Sprintf("%s %v [trace_id=%s]", msg, fields, traceID)
+	}
+	return formatLogMessage(msg, fields...)
 }

@@ -10,18 +10,26 @@ import (
 
 // Config holds all application configuration
 type Config struct {
-	App             AppConfig       `mapstructure:"app"`
-	Server          ServerConfig    `mapstructure:"server"`
-	AuthDatabase    DatabaseConfig  `mapstructure:"auth_database"`    // Auth service database (required for auth-service)
-	TicketDatabase  DatabaseConfig  `mapstructure:"ticket_database"`  // Ticket service database (required for ticket-service)
-	BookingDatabase DatabaseConfig  `mapstructure:"booking_database"` // Booking service database
-	PaymentDatabase DatabaseConfig  `mapstructure:"payment_database"` // Payment service database
-	Redis           RedisConfig     `mapstructure:"redis"`
-	Kafka           KafkaConfig     `mapstructure:"kafka"`
-	MongoDB         MongoDBConfig   `mapstructure:"mongodb"`
-	JWT             JWTConfig       `mapstructure:"jwt"`
-	OTel            OTelConfig      `mapstructure:"otel"`
-	Services        ServicesConfig  `mapstructure:"services"`
+	App             AppConfig              `mapstructure:"app"`
+	Server          ServerConfig           `mapstructure:"server"`
+	AuthDatabase    DatabaseConfig         `mapstructure:"auth_database"`    // Auth service database (required for auth-service)
+	TicketDatabase  DatabaseConfig         `mapstructure:"ticket_database"`  // Ticket service database (required for ticket-service)
+	BookingDatabase DatabaseConfig         `mapstructure:"booking_database"` // Booking service database
+	PaymentDatabase DatabaseConfig         `mapstructure:"payment_database"` // Payment service database
+	Redis           RedisConfig            `mapstructure:"redis"`
+	Kafka           KafkaConfig            `mapstructure:"kafka"`
+	MongoDB         MongoDBConfig          `mapstructure:"mongodb"`
+	JWT             JWTConfig              `mapstructure:"jwt"`
+	OTel            OTelConfig             `mapstructure:"otel"`
+	Services        ServicesConfig         `mapstructure:"services"`
+	Booking         BookingServiceConfig   `mapstructure:"booking"` // Booking service specific config
+}
+
+// BookingServiceConfig holds booking service specific settings
+type BookingServiceConfig struct {
+	MaxTicketsPerUser     int  `mapstructure:"max_tickets_per_user"`    // Maximum tickets per user per event (0 = unlimited)
+	ReservationTTLMinutes int  `mapstructure:"reservation_ttl_minutes"` // Reservation TTL in minutes
+	RequireQueuePass      bool `mapstructure:"require_queue_pass"`      // Require queue pass for booking (virtual queue enforcement)
 }
 
 // ServicesConfig holds URLs of other microservices
@@ -282,6 +290,11 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("OTEL_COLLECTOR_ADDR", "localhost:4317")
 	v.SetDefault("OTEL_SAMPLE_RATIO", 1.0)
 	v.SetDefault("OTEL_LOG_EXPORT_ENABLED", false) // Disabled by default, enable to send logs to Loki via OTel
+
+	// Booking service defaults
+	v.SetDefault("MAX_TICKETS_PER_USER", 10)        // Default 10 tickets per user per event
+	v.SetDefault("RESERVATION_TTL_MINUTES", 10)    // Default 10 minutes reservation TTL
+	v.SetDefault("REQUIRE_QUEUE_PASS", false)      // Default: don't require queue pass (for backward compatibility)
 }
 
 func bindConfig(v *viper.Viper, cfg *Config) error {
@@ -383,6 +396,11 @@ func bindConfig(v *viper.Viper, cfg *Config) error {
 	cfg.OTel.CollectorAddr = v.GetString("OTEL_COLLECTOR_ADDR")
 	cfg.OTel.SampleRatio = v.GetFloat64("OTEL_SAMPLE_RATIO")
 	cfg.OTel.LogExportEnabled = v.GetBool("OTEL_LOG_EXPORT_ENABLED")
+
+	// Booking service config
+	cfg.Booking.MaxTicketsPerUser = v.GetInt("MAX_TICKETS_PER_USER")
+	cfg.Booking.ReservationTTLMinutes = v.GetInt("RESERVATION_TTL_MINUTES")
+	cfg.Booking.RequireQueuePass = v.GetBool("REQUIRE_QUEUE_PASS")
 
 	return nil
 }

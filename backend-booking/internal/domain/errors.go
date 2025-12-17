@@ -37,11 +37,16 @@ var (
 	ErrEventNotFound = errors.New("event not found")
 
 	// Queue errors
-	ErrQueueNotOpen     = errors.New("queue is not open for this event")
-	ErrAlreadyInQueue   = errors.New("user is already in queue")
-	ErrNotInQueue       = errors.New("user is not in queue")
-	ErrQueueFull        = errors.New("queue is full")
-	ErrInvalidQueueToken = errors.New("invalid queue token")
+	ErrQueueNotOpen          = errors.New("queue is not open for this event")
+	ErrAlreadyInQueue        = errors.New("user is already in queue")
+	ErrNotInQueue            = errors.New("user is not in queue")
+	ErrQueueFull             = errors.New("queue is full")
+	ErrInvalidQueueToken     = errors.New("invalid queue token")
+	ErrQueuePassRequired     = errors.New("queue pass is required")
+	ErrInvalidQueuePass      = errors.New("invalid queue pass")
+	ErrQueuePassExpired      = errors.New("queue pass has expired or already used")
+	ErrQueuePassUserMismatch = errors.New("queue pass does not belong to this user")
+	ErrQueuePassEventMismatch = errors.New("queue pass is for a different event")
 )
 
 // IsNotFoundError checks if the error is a not found error

@@ -15,6 +15,9 @@ import (
 	"github.com/prohmpiriya/booking-rush-10k-rps/backend-payment/internal/dto"
 	"github.com/prohmpiriya/booking-rush-10k-rps/backend-payment/internal/gateway"
 	"github.com/prohmpiriya/booking-rush-10k-rps/backend-payment/internal/service"
+	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/telemetry"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 )
 
 // PaymentHandler handles payment HTTP endpoints
@@ -36,8 +39,14 @@ func NewPaymentHandler(paymentService service.PaymentService, paymentGateway gat
 // CreatePayment handles POST /payments
 // Creates a new payment and optionally processes it immediately
 func (h *PaymentHandler) CreatePayment(c *gin.Context) {
+	ctx, span := telemetry.StartSpan(c.Request.Context(), "handler.payment.create")
+	defer span.End()
+	c.Request = c.Request.WithContext(ctx)
+
 	var req dto.CreatePaymentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "validation error")
 		c.JSON(http.StatusBadRequest, dto.NewErrorResponse("VALIDATION_ERROR", err.Error()))
 		return
 	}
@@ -48,6 +57,7 @@ func (h *PaymentHandler) CreatePayment(c *gin.Context) {
 		tenantID = c.GetString("tenant_id")
 	}
 	if tenantID == "" {
+		span.SetStatus(codes.Error, "tenant_id required")
 		c.JSON(http.StatusUnauthorized, dto.NewErrorResponse("UNAUTHORIZED", "tenant_id is required"))
 		return
 	}
@@ -58,9 +68,18 @@ func (h *PaymentHandler) CreatePayment(c *gin.Context) {
 		userID = c.GetString("user_id")
 	}
 	if userID == "" {
+		span.SetStatus(codes.Error, "user_id required")
 		c.JSON(http.StatusUnauthorized, dto.NewErrorResponse("UNAUTHORIZED", "user_id is required"))
 		return
 	}
+
+	span.SetAttributes(
+		attribute.String("booking_id", req.BookingID),
+		attribute.String("user_id", userID),
+		attribute.Float64("amount", req.Amount),
+		attribute.String("currency", req.Currency),
+		attribute.String("method", string(req.Method)),
+	)
 
 	// Create payment request for service
 	svcReq := &service.CreatePaymentRequest{
@@ -73,83 +92,119 @@ func (h *PaymentHandler) CreatePayment(c *gin.Context) {
 		Metadata:  req.Metadata,
 	}
 
-	payment, err := h.paymentService.CreatePayment(c.Request.Context(), svcReq)
+	payment, err := h.paymentService.CreatePayment(ctx, svcReq)
 	if err != nil {
+		span.RecordError(err)
 		if errors.Is(err, domain.ErrPaymentAlreadyExists) {
+			span.SetStatus(codes.Error, "payment exists")
 			c.JSON(http.StatusConflict, dto.NewErrorResponse("PAYMENT_EXISTS", "payment already exists for this booking"))
 			return
 		}
+		span.SetStatus(codes.Error, err.Error())
 		c.JSON(http.StatusInternalServerError, dto.NewErrorResponse("CREATE_FAILED", err.Error()))
 		return
 	}
 
+	span.SetAttributes(attribute.String("payment_id", payment.ID))
+
 	// Check if auto-process is requested
 	autoProcess := c.Query("auto_process") == "true"
 	if autoProcess {
-		payment, err = h.paymentService.ProcessPayment(c.Request.Context(), payment.ID)
+		span.SetAttributes(attribute.Bool("auto_process", true))
+		payment, err = h.paymentService.ProcessPayment(ctx, payment.ID)
 		if err != nil {
+			span.RecordError(err)
 			// Payment created but processing failed - still return the payment with its current status
 			c.JSON(http.StatusAccepted, dto.NewSuccessResponse(dto.FromPayment(payment)))
 			return
 		}
 	}
 
+	span.SetStatus(codes.Ok, "")
 	c.JSON(http.StatusCreated, dto.NewSuccessResponse(dto.FromPayment(payment)))
 }
 
 // GetPayment handles GET /payments/:id
 // Returns payment details by ID
 func (h *PaymentHandler) GetPayment(c *gin.Context) {
+	ctx, span := telemetry.StartSpan(c.Request.Context(), "handler.payment.get")
+	defer span.End()
+	c.Request = c.Request.WithContext(ctx)
+
 	paymentID := c.Param("id")
 	if paymentID == "" {
+		span.SetStatus(codes.Error, "payment_id required")
 		c.JSON(http.StatusBadRequest, dto.NewErrorResponse("VALIDATION_ERROR", "payment_id is required"))
 		return
 	}
 
-	payment, err := h.paymentService.GetPayment(c.Request.Context(), paymentID)
+	span.SetAttributes(attribute.String("payment_id", paymentID))
+
+	payment, err := h.paymentService.GetPayment(ctx, paymentID)
 	if err != nil {
+		span.RecordError(err)
 		if errors.Is(err, domain.ErrPaymentNotFound) {
+			span.SetStatus(codes.Error, "not found")
 			c.JSON(http.StatusNotFound, dto.NewErrorResponse("NOT_FOUND", "payment not found"))
 			return
 		}
+		span.SetStatus(codes.Error, err.Error())
 		c.JSON(http.StatusInternalServerError, dto.NewErrorResponse("GET_FAILED", err.Error()))
 		return
 	}
 
+	span.SetStatus(codes.Ok, "")
 	c.JSON(http.StatusOK, dto.NewSuccessResponse(dto.FromPayment(payment)))
 }
 
 // GetPaymentByBookingID handles GET /payments/booking/:bookingId
 // Returns payment details by booking ID
 func (h *PaymentHandler) GetPaymentByBookingID(c *gin.Context) {
+	ctx, span := telemetry.StartSpan(c.Request.Context(), "handler.payment.get_by_booking")
+	defer span.End()
+	c.Request = c.Request.WithContext(ctx)
+
 	bookingID := c.Param("bookingId")
 	if bookingID == "" {
+		span.SetStatus(codes.Error, "booking_id required")
 		c.JSON(http.StatusBadRequest, dto.NewErrorResponse("VALIDATION_ERROR", "booking_id is required"))
 		return
 	}
 
-	payment, err := h.paymentService.GetPaymentByBookingID(c.Request.Context(), bookingID)
+	span.SetAttributes(attribute.String("booking_id", bookingID))
+
+	payment, err := h.paymentService.GetPaymentByBookingID(ctx, bookingID)
 	if err != nil {
+		span.RecordError(err)
 		if errors.Is(err, domain.ErrPaymentNotFound) {
+			span.SetStatus(codes.Error, "not found")
 			c.JSON(http.StatusNotFound, dto.NewErrorResponse("NOT_FOUND", "payment not found for this booking"))
 			return
 		}
+		span.SetStatus(codes.Error, err.Error())
 		c.JSON(http.StatusInternalServerError, dto.NewErrorResponse("GET_FAILED", err.Error()))
 		return
 	}
 
+	span.SetAttributes(attribute.String("payment_id", payment.ID))
+	span.SetStatus(codes.Ok, "")
 	c.JSON(http.StatusOK, dto.NewSuccessResponse(dto.FromPayment(payment)))
 }
 
 // GetUserPayments handles GET /payments/user/:userId
 // Returns all payments for a user with pagination
 func (h *PaymentHandler) GetUserPayments(c *gin.Context) {
+	ctx, span := telemetry.StartSpan(c.Request.Context(), "handler.payment.list_user")
+	defer span.End()
+	c.Request = c.Request.WithContext(ctx)
+
 	userID := c.Param("userId")
 	if userID == "" {
 		// Try to get from auth context
 		userID = c.GetString("user_id")
 	}
 	if userID == "" {
+		span.SetStatus(codes.Error, "user_id required")
 		c.JSON(http.StatusBadRequest, dto.NewErrorResponse("VALIDATION_ERROR", "user_id is required"))
 		return
 	}
@@ -168,8 +223,16 @@ func (h *PaymentHandler) GetUserPayments(c *gin.Context) {
 		}
 	}
 
-	payments, err := h.paymentService.GetUserPayments(c.Request.Context(), userID, limit, offset)
+	span.SetAttributes(
+		attribute.String("user_id", userID),
+		attribute.Int("limit", limit),
+		attribute.Int("offset", offset),
+	)
+
+	payments, err := h.paymentService.GetUserPayments(ctx, userID, limit, offset)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		c.JSON(http.StatusInternalServerError, dto.NewErrorResponse("GET_FAILED", err.Error()))
 		return
 	}
@@ -180,6 +243,8 @@ func (h *PaymentHandler) GetUserPayments(c *gin.Context) {
 		paymentResponses[i] = dto.FromPayment(p)
 	}
 
+	span.SetAttributes(attribute.Int("count", len(paymentResponses)))
+	span.SetStatus(codes.Ok, "")
 	c.JSON(http.StatusOK, dto.NewSuccessResponse(&dto.PaymentListResponse{
 		Payments: paymentResponses,
 		Total:    len(paymentResponses),
@@ -189,37 +254,57 @@ func (h *PaymentHandler) GetUserPayments(c *gin.Context) {
 // ProcessPayment handles POST /payments/:id/process
 // Processes a pending payment
 func (h *PaymentHandler) ProcessPayment(c *gin.Context) {
+	ctx, span := telemetry.StartSpan(c.Request.Context(), "handler.payment.process")
+	defer span.End()
+	c.Request = c.Request.WithContext(ctx)
+
 	paymentID := c.Param("id")
 	if paymentID == "" {
+		span.SetStatus(codes.Error, "payment_id required")
 		c.JSON(http.StatusBadRequest, dto.NewErrorResponse("VALIDATION_ERROR", "payment_id is required"))
 		return
 	}
 
-	payment, err := h.paymentService.ProcessPayment(c.Request.Context(), paymentID)
+	span.SetAttributes(attribute.String("payment_id", paymentID))
+
+	payment, err := h.paymentService.ProcessPayment(ctx, paymentID)
 	if err != nil {
+		span.RecordError(err)
 		if errors.Is(err, domain.ErrPaymentNotFound) {
+			span.SetStatus(codes.Error, "not found")
 			c.JSON(http.StatusNotFound, dto.NewErrorResponse("NOT_FOUND", "payment not found"))
 			return
 		}
 		if errors.Is(err, domain.ErrInvalidPaymentStatus) {
+			span.SetStatus(codes.Error, "invalid status")
 			c.JSON(http.StatusBadRequest, dto.NewErrorResponse("INVALID_STATUS", "payment cannot be processed in current status"))
 			return
 		}
+		span.SetStatus(codes.Error, err.Error())
 		c.JSON(http.StatusInternalServerError, dto.NewErrorResponse("PROCESS_FAILED", err.Error()))
 		return
 	}
 
+	span.SetAttributes(attribute.String("status", string(payment.Status)))
+	span.SetStatus(codes.Ok, "")
 	c.JSON(http.StatusOK, dto.NewSuccessResponse(dto.FromPayment(payment)))
 }
 
 // RefundPayment handles POST /payments/:id/refund
 // Refunds a completed payment
 func (h *PaymentHandler) RefundPayment(c *gin.Context) {
+	ctx, span := telemetry.StartSpan(c.Request.Context(), "handler.payment.refund")
+	defer span.End()
+	c.Request = c.Request.WithContext(ctx)
+
 	paymentID := c.Param("id")
 	if paymentID == "" {
+		span.SetStatus(codes.Error, "payment_id required")
 		c.JSON(http.StatusBadRequest, dto.NewErrorResponse("VALIDATION_ERROR", "payment_id is required"))
 		return
 	}
+
+	span.SetAttributes(attribute.String("payment_id", paymentID))
 
 	var req dto.RefundPaymentRequest
 	// Request body is optional for full refund
@@ -230,54 +315,79 @@ func (h *PaymentHandler) RefundPayment(c *gin.Context) {
 		reason = "customer_request"
 	}
 
-	payment, err := h.paymentService.RefundPayment(c.Request.Context(), paymentID, reason)
+	span.SetAttributes(attribute.String("reason", reason))
+
+	payment, err := h.paymentService.RefundPayment(ctx, paymentID, reason)
 	if err != nil {
+		span.RecordError(err)
 		if errors.Is(err, domain.ErrPaymentNotFound) {
+			span.SetStatus(codes.Error, "not found")
 			c.JSON(http.StatusNotFound, dto.NewErrorResponse("NOT_FOUND", "payment not found"))
 			return
 		}
 		if errors.Is(err, domain.ErrInvalidPaymentStatus) {
+			span.SetStatus(codes.Error, "invalid status")
 			c.JSON(http.StatusBadRequest, dto.NewErrorResponse("INVALID_STATUS", "payment cannot be refunded in current status"))
 			return
 		}
+		span.SetStatus(codes.Error, err.Error())
 		c.JSON(http.StatusInternalServerError, dto.NewErrorResponse("REFUND_FAILED", err.Error()))
 		return
 	}
 
+	span.SetStatus(codes.Ok, "")
 	c.JSON(http.StatusOK, dto.NewSuccessResponse(dto.FromPayment(payment)))
 }
 
 // CancelPayment handles POST /payments/:id/cancel
 // Cancels a pending payment
 func (h *PaymentHandler) CancelPayment(c *gin.Context) {
+	ctx, span := telemetry.StartSpan(c.Request.Context(), "handler.payment.cancel")
+	defer span.End()
+	c.Request = c.Request.WithContext(ctx)
+
 	paymentID := c.Param("id")
 	if paymentID == "" {
+		span.SetStatus(codes.Error, "payment_id required")
 		c.JSON(http.StatusBadRequest, dto.NewErrorResponse("VALIDATION_ERROR", "payment_id is required"))
 		return
 	}
 
-	payment, err := h.paymentService.CancelPayment(c.Request.Context(), paymentID)
+	span.SetAttributes(attribute.String("payment_id", paymentID))
+
+	payment, err := h.paymentService.CancelPayment(ctx, paymentID)
 	if err != nil {
+		span.RecordError(err)
 		if errors.Is(err, domain.ErrPaymentNotFound) {
+			span.SetStatus(codes.Error, "not found")
 			c.JSON(http.StatusNotFound, dto.NewErrorResponse("NOT_FOUND", "payment not found"))
 			return
 		}
 		if errors.Is(err, domain.ErrInvalidPaymentStatus) {
+			span.SetStatus(codes.Error, "invalid status")
 			c.JSON(http.StatusBadRequest, dto.NewErrorResponse("INVALID_STATUS", "payment cannot be cancelled in current status"))
 			return
 		}
+		span.SetStatus(codes.Error, err.Error())
 		c.JSON(http.StatusInternalServerError, dto.NewErrorResponse("CANCEL_FAILED", err.Error()))
 		return
 	}
 
+	span.SetStatus(codes.Ok, "")
 	c.JSON(http.StatusOK, dto.NewSuccessResponse(dto.FromPayment(payment)))
 }
 
 // CreatePaymentIntent handles POST /payments/intent
 // Creates a Stripe PaymentIntent and returns client_secret for frontend
 func (h *PaymentHandler) CreatePaymentIntent(c *gin.Context) {
+	ctx, span := telemetry.StartSpan(c.Request.Context(), "handler.payment.create_intent")
+	defer span.End()
+	c.Request = c.Request.WithContext(ctx)
+
 	var req dto.CreatePaymentIntentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "validation error")
 		c.JSON(http.StatusBadRequest, dto.NewErrorResponse("VALIDATION_ERROR", err.Error()))
 		return
 	}
@@ -288,6 +398,7 @@ func (h *PaymentHandler) CreatePaymentIntent(c *gin.Context) {
 		tenantID = c.GetString("tenant_id")
 	}
 	if tenantID == "" {
+		span.SetStatus(codes.Error, "tenant_id required")
 		c.JSON(http.StatusUnauthorized, dto.NewErrorResponse("UNAUTHORIZED", "tenant_id is required"))
 		return
 	}
@@ -298,6 +409,7 @@ func (h *PaymentHandler) CreatePaymentIntent(c *gin.Context) {
 		userID = c.GetString("user_id")
 	}
 	if userID == "" {
+		span.SetStatus(codes.Error, "user_id required")
 		c.JSON(http.StatusUnauthorized, dto.NewErrorResponse("UNAUTHORIZED", "user_id is required"))
 		return
 	}
@@ -307,6 +419,13 @@ func (h *PaymentHandler) CreatePaymentIntent(c *gin.Context) {
 	if currency == "" {
 		currency = "THB"
 	}
+
+	span.SetAttributes(
+		attribute.String("booking_id", req.BookingID),
+		attribute.String("user_id", userID),
+		attribute.Float64("amount", req.Amount),
+		attribute.String("currency", currency),
+	)
 
 	// Create payment record first
 	svcReq := &service.CreatePaymentRequest{
@@ -318,20 +437,26 @@ func (h *PaymentHandler) CreatePaymentIntent(c *gin.Context) {
 		Method:    domain.PaymentMethodCreditCard,
 	}
 
-	payment, err := h.paymentService.CreatePayment(c.Request.Context(), svcReq)
+	payment, err := h.paymentService.CreatePayment(ctx, svcReq)
 	if err != nil {
 		if errors.Is(err, domain.ErrPaymentAlreadyExists) {
 			// If payment already exists, get it and create new intent
-			payment, err = h.paymentService.GetPaymentByBookingID(c.Request.Context(), req.BookingID)
+			payment, err = h.paymentService.GetPaymentByBookingID(ctx, req.BookingID)
 			if err != nil {
+				span.RecordError(err)
+				span.SetStatus(codes.Error, err.Error())
 				c.JSON(http.StatusInternalServerError, dto.NewErrorResponse("GET_PAYMENT_FAILED", err.Error()))
 				return
 			}
 		} else {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
 			c.JSON(http.StatusInternalServerError, dto.NewErrorResponse("CREATE_FAILED", err.Error()))
 			return
 		}
 	}
+
+	span.SetAttributes(attribute.String("payment_id", payment.ID))
 
 	// Create PaymentIntent via gateway
 	intentReq := &gateway.PaymentIntentRequest{
@@ -346,12 +471,16 @@ func (h *PaymentHandler) CreatePaymentIntent(c *gin.Context) {
 		},
 	}
 
-	intentResp, err := h.paymentGateway.CreatePaymentIntent(c.Request.Context(), intentReq)
+	intentResp, err := h.paymentGateway.CreatePaymentIntent(ctx, intentReq)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		c.JSON(http.StatusInternalServerError, dto.NewErrorResponse("PAYMENT_INTENT_FAILED", err.Error()))
 		return
 	}
 
+	span.SetAttributes(attribute.String("payment_intent_id", intentResp.PaymentIntentID))
+	span.SetStatus(codes.Ok, "")
 	c.JSON(http.StatusOK, dto.NewSuccessResponse(&dto.PaymentIntentResponse{
 		PaymentID:       payment.ID,
 		ClientSecret:    intentResp.ClientSecret,
@@ -365,30 +494,48 @@ func (h *PaymentHandler) CreatePaymentIntent(c *gin.Context) {
 // ConfirmPaymentIntent handles POST /payments/intent/confirm
 // Confirms payment after Stripe client-side completion
 func (h *PaymentHandler) ConfirmPaymentIntent(c *gin.Context) {
+	ctx, span := telemetry.StartSpan(c.Request.Context(), "handler.payment.confirm_intent")
+	defer span.End()
+	c.Request = c.Request.WithContext(ctx)
+
 	var req dto.ConfirmPaymentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "validation error")
 		c.JSON(http.StatusBadRequest, dto.NewErrorResponse("VALIDATION_ERROR", err.Error()))
 		return
 	}
 
+	span.SetAttributes(
+		attribute.String("payment_id", req.PaymentID),
+		attribute.String("payment_intent_id", req.PaymentIntentID),
+	)
+
 	// Verify PaymentIntent status with Stripe
-	intentResp, err := h.paymentGateway.ConfirmPaymentIntent(c.Request.Context(), req.PaymentIntentID)
+	intentResp, err := h.paymentGateway.ConfirmPaymentIntent(ctx, req.PaymentIntentID)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		c.JSON(http.StatusInternalServerError, dto.NewErrorResponse("CONFIRM_FAILED", err.Error()))
 		return
 	}
 
+	span.SetAttributes(attribute.String("stripe_status", intentResp.Status))
+
 	// Get the payment
-	payment, err := h.paymentService.GetPayment(c.Request.Context(), req.PaymentID)
+	payment, err := h.paymentService.GetPayment(ctx, req.PaymentID)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "payment not found")
 		c.JSON(http.StatusNotFound, dto.NewErrorResponse("NOT_FOUND", "payment not found"))
 		return
 	}
 
 	// If Stripe says succeeded, process our payment
 	if intentResp.Status == "succeeded" {
-		processedPayment, err := h.paymentService.ProcessPayment(c.Request.Context(), req.PaymentID)
+		processedPayment, err := h.paymentService.ProcessPayment(ctx, req.PaymentID)
 		if err != nil {
+			span.RecordError(err)
 			// ProcessPayment failed, return current payment status
 			c.JSON(http.StatusOK, dto.NewSuccessResponse(map[string]interface{}{
 				"payment_id":        req.PaymentID,
@@ -402,6 +549,8 @@ func (h *PaymentHandler) ConfirmPaymentIntent(c *gin.Context) {
 		payment = processedPayment
 	}
 
+	span.SetAttributes(attribute.String("status", string(payment.Status)))
+	span.SetStatus(codes.Ok, "")
 	c.JSON(http.StatusOK, dto.NewSuccessResponse(map[string]interface{}{
 		"payment_id":        payment.ID,
 		"status":            payment.Status,
@@ -413,8 +562,14 @@ func (h *PaymentHandler) ConfirmPaymentIntent(c *gin.Context) {
 // CreatePortalSession handles POST /payments/portal
 // Creates a Stripe Customer Portal session for managing payment methods
 func (h *PaymentHandler) CreatePortalSession(c *gin.Context) {
+	ctx, span := telemetry.StartSpan(c.Request.Context(), "handler.payment.create_portal")
+	defer span.End()
+	c.Request = c.Request.WithContext(ctx)
+
 	var req dto.CreatePortalSessionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "validation error")
 		c.JSON(http.StatusBadRequest, dto.NewErrorResponse("VALIDATION_ERROR", err.Error()))
 		return
 	}
@@ -429,24 +584,31 @@ func (h *PaymentHandler) CreatePortalSession(c *gin.Context) {
 		userEmail = c.GetString("email")
 	}
 	if userID == "" {
+		span.SetStatus(codes.Error, "user_id required")
 		c.JSON(http.StatusUnauthorized, dto.NewErrorResponse("UNAUTHORIZED", "user_id is required"))
 		return
 	}
 
+	span.SetAttributes(attribute.String("user_id", userID))
+
 	// Get Stripe Customer ID from Auth Service
 	stripeCustomerID, err := h.getStripeCustomerID(h.authServiceURL, userID)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		c.JSON(http.StatusInternalServerError, dto.NewErrorResponse("AUTH_SERVICE_ERROR", err.Error()))
 		return
 	}
 
 	// If user doesn't have a Stripe Customer ID, create one
 	if stripeCustomerID == "" {
-		customerResp, err := h.paymentGateway.CreateCustomer(c.Request.Context(), &gateway.CreateCustomerRequest{
+		customerResp, err := h.paymentGateway.CreateCustomer(ctx, &gateway.CreateCustomerRequest{
 			UserID: userID,
 			Email:  userEmail,
 		})
 		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
 			c.JSON(http.StatusInternalServerError, dto.NewErrorResponse("CREATE_CUSTOMER_FAILED", err.Error()))
 			return
 		}
@@ -459,16 +621,21 @@ func (h *PaymentHandler) CreatePortalSession(c *gin.Context) {
 		}
 	}
 
+	span.SetAttributes(attribute.String("stripe_customer_id", stripeCustomerID))
+
 	// Create Portal Session
-	portalResp, err := h.paymentGateway.CreatePortalSession(c.Request.Context(), &gateway.PortalSessionRequest{
+	portalResp, err := h.paymentGateway.CreatePortalSession(ctx, &gateway.PortalSessionRequest{
 		CustomerID: stripeCustomerID,
 		ReturnURL:  req.ReturnURL,
 	})
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		c.JSON(http.StatusInternalServerError, dto.NewErrorResponse("CREATE_PORTAL_FAILED", err.Error()))
 		return
 	}
 
+	span.SetStatus(codes.Ok, "")
 	c.JSON(http.StatusOK, dto.NewSuccessResponse(&dto.PortalSessionResponse{
 		URL: portalResp.URL,
 	}))
@@ -542,25 +709,36 @@ func (h *PaymentHandler) updateStripeCustomerID(authServiceURL, userID, stripeCu
 // ListPaymentMethods handles GET /payments/methods
 // Returns saved payment methods for the current user
 func (h *PaymentHandler) ListPaymentMethods(c *gin.Context) {
+	ctx, span := telemetry.StartSpan(c.Request.Context(), "handler.payment.list_methods")
+	defer span.End()
+	c.Request = c.Request.WithContext(ctx)
+
 	// Get user ID from headers
 	userID := c.GetHeader("X-User-ID")
 	if userID == "" {
 		userID = c.GetString("user_id")
 	}
 	if userID == "" {
+		span.SetStatus(codes.Error, "user_id required")
 		c.JSON(http.StatusUnauthorized, dto.NewErrorResponse("UNAUTHORIZED", "user_id is required"))
 		return
 	}
 
+	span.SetAttributes(attribute.String("user_id", userID))
+
 	// Get Stripe Customer ID from Auth Service
 	stripeCustomerID, err := h.getStripeCustomerID(h.authServiceURL, userID)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		c.JSON(http.StatusInternalServerError, dto.NewErrorResponse("AUTH_SERVICE_ERROR", err.Error()))
 		return
 	}
 
 	// If user doesn't have a Stripe Customer ID, return empty list
 	if stripeCustomerID == "" {
+		span.SetAttributes(attribute.Int("count", 0))
+		span.SetStatus(codes.Ok, "")
 		c.JSON(http.StatusOK, dto.NewSuccessResponse(&dto.PaymentMethodsListResponse{
 			PaymentMethods: []*dto.PaymentMethodResponse{},
 			Total:          0,
@@ -568,9 +746,13 @@ func (h *PaymentHandler) ListPaymentMethods(c *gin.Context) {
 		return
 	}
 
+	span.SetAttributes(attribute.String("stripe_customer_id", stripeCustomerID))
+
 	// Get payment methods from Stripe
-	paymentMethods, err := h.paymentGateway.ListPaymentMethods(c.Request.Context(), stripeCustomerID)
+	paymentMethods, err := h.paymentGateway.ListPaymentMethods(ctx, stripeCustomerID)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		c.JSON(http.StatusInternalServerError, dto.NewErrorResponse("LIST_METHODS_FAILED", err.Error()))
 		return
 	}
@@ -589,6 +771,8 @@ func (h *PaymentHandler) ListPaymentMethods(c *gin.Context) {
 		}
 	}
 
+	span.SetAttributes(attribute.Int("count", len(methodResponses)))
+	span.SetStatus(codes.Ok, "")
 	c.JSON(http.StatusOK, dto.NewSuccessResponse(&dto.PaymentMethodsListResponse{
 		PaymentMethods: methodResponses,
 		Total:          len(methodResponses),

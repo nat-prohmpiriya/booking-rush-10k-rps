@@ -8,6 +8,9 @@ import (
 
 	"github.com/google/uuid"
 	pkgredis "github.com/prohmpiriya/booking-rush-10k-rps/pkg/redis"
+	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/telemetry"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 )
 
 //go:embed scripts/reserve_seats.lua
@@ -55,6 +58,16 @@ func (r *RedisReservationRepository) LoadScripts(ctx context.Context) error {
 
 // ReserveSeats atomically reserves seats using Lua script
 func (r *RedisReservationRepository) ReserveSeats(ctx context.Context, params ReserveParams) (*ReserveResult, error) {
+	ctx, span := telemetry.StartSpan(ctx, "repo.redis.reservation.reserve_seats")
+	defer span.End()
+
+	span.SetAttributes(
+		attribute.String("zone_id", params.ZoneID),
+		attribute.String("user_id", params.UserID),
+		attribute.String("event_id", params.EventID),
+		attribute.Int("quantity", params.Quantity),
+	)
+
 	// Generate booking ID if not provided
 	bookingID := uuid.New().String()
 
@@ -78,16 +91,21 @@ func (r *RedisReservationRepository) ReserveSeats(ctx context.Context, params Re
 
 	result := r.client.EvalWithFallback(ctx, scriptReserveSeats, reserveSeatsScript, keys, args...)
 	if result.Err() != nil {
+		span.RecordError(result.Err())
+		span.SetStatus(codes.Error, result.Err().Error())
 		return nil, fmt.Errorf("failed to execute reserve_seats script: %w", result.Err())
 	}
 
 	// Parse result
 	values, err := result.Slice()
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, fmt.Errorf("failed to parse script result: %w", err)
 	}
 
 	if len(values) < 3 {
+		span.SetStatus(codes.Error, "unexpected result length")
 		return nil, fmt.Errorf("unexpected script result length: %d", len(values))
 	}
 
@@ -95,6 +113,11 @@ func (r *RedisReservationRepository) ReserveSeats(ctx context.Context, params Re
 	if success == 1 {
 		availableSeats, _ := toInt64(values[1])
 		userReserved, _ := toInt64(values[2])
+		span.SetAttributes(
+			attribute.String("booking_id", bookingID),
+			attribute.Int64("available_seats", availableSeats),
+		)
+		span.SetStatus(codes.Ok, "")
 		return &ReserveResult{
 			Success:        true,
 			BookingID:      bookingID,
@@ -106,6 +129,8 @@ func (r *RedisReservationRepository) ReserveSeats(ctx context.Context, params Re
 	// Error case
 	errorCode, _ := values[1].(string)
 	errorMessage, _ := values[2].(string)
+	span.SetAttributes(attribute.String("error_code", errorCode))
+	span.SetStatus(codes.Error, errorCode)
 	return &ReserveResult{
 		Success:      false,
 		ErrorCode:    errorCode,
@@ -115,22 +140,35 @@ func (r *RedisReservationRepository) ReserveSeats(ctx context.Context, params Re
 
 // ConfirmBooking confirms a reservation and makes it permanent
 func (r *RedisReservationRepository) ConfirmBooking(ctx context.Context, bookingID, userID, paymentID string) (*ConfirmResult, error) {
+	ctx, span := telemetry.StartSpan(ctx, "repo.redis.reservation.confirm")
+	defer span.End()
+
+	span.SetAttributes(
+		attribute.String("booking_id", bookingID),
+		attribute.String("user_id", userID),
+	)
+
 	reservationKey := fmt.Sprintf("reservation:%s", bookingID)
 	keys := []string{reservationKey}
 	args := []interface{}{bookingID, userID, paymentID}
 
 	result := r.client.EvalWithFallback(ctx, scriptConfirmBooking, confirmBookingScript, keys, args...)
 	if result.Err() != nil {
+		span.RecordError(result.Err())
+		span.SetStatus(codes.Error, result.Err().Error())
 		return nil, fmt.Errorf("failed to execute confirm_booking script: %w", result.Err())
 	}
 
 	// Parse result
 	values, err := result.Slice()
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, fmt.Errorf("failed to parse script result: %w", err)
 	}
 
 	if len(values) < 3 {
+		span.SetStatus(codes.Error, "unexpected result length")
 		return nil, fmt.Errorf("unexpected script result length: %d", len(values))
 	}
 
@@ -138,6 +176,7 @@ func (r *RedisReservationRepository) ConfirmBooking(ctx context.Context, booking
 	if success == 1 {
 		status, _ := values[1].(string)
 		confirmedAt, _ := values[2].(string)
+		span.SetStatus(codes.Ok, "")
 		return &ConfirmResult{
 			Success:     true,
 			Status:      status,
@@ -148,6 +187,8 @@ func (r *RedisReservationRepository) ConfirmBooking(ctx context.Context, booking
 	// Error case
 	errorCode, _ := values[1].(string)
 	errorMessage, _ := values[2].(string)
+	span.SetAttributes(attribute.String("error_code", errorCode))
+	span.SetStatus(codes.Error, errorCode)
 	return &ConfirmResult{
 		Success:      false,
 		ErrorCode:    errorCode,
@@ -157,14 +198,25 @@ func (r *RedisReservationRepository) ConfirmBooking(ctx context.Context, booking
 
 // ReleaseSeats releases reserved seats back to inventory
 func (r *RedisReservationRepository) ReleaseSeats(ctx context.Context, bookingID, userID string) (*ReleaseResult, error) {
+	ctx, span := telemetry.StartSpan(ctx, "repo.redis.reservation.release_seats")
+	defer span.End()
+
+	span.SetAttributes(
+		attribute.String("booking_id", bookingID),
+		attribute.String("user_id", userID),
+	)
+
 	// First, get the reservation to find the zone_id and event_id
 	reservationKey := fmt.Sprintf("reservation:%s", bookingID)
 	reservationData, err := r.client.HGetAll(ctx, reservationKey).Result()
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, fmt.Errorf("failed to get reservation: %w", err)
 	}
 
 	if len(reservationData) == 0 {
+		span.SetStatus(codes.Error, "RESERVATION_NOT_FOUND")
 		return &ReleaseResult{
 			Success:      false,
 			ErrorCode:    "RESERVATION_NOT_FOUND",
@@ -175,6 +227,11 @@ func (r *RedisReservationRepository) ReleaseSeats(ctx context.Context, bookingID
 	zoneID := reservationData["zone_id"]
 	eventID := reservationData["event_id"]
 
+	span.SetAttributes(
+		attribute.String("zone_id", zoneID),
+		attribute.String("event_id", eventID),
+	)
+
 	// Build Redis keys
 	zoneAvailabilityKey := fmt.Sprintf("zone:availability:%s", zoneID)
 	userReservationsKey := fmt.Sprintf("user:reservations:%s:%s", userID, eventID)
@@ -184,16 +241,21 @@ func (r *RedisReservationRepository) ReleaseSeats(ctx context.Context, bookingID
 
 	result := r.client.EvalWithFallback(ctx, scriptReleaseSeats, releaseSeatsScript, keys, args...)
 	if result.Err() != nil {
+		span.RecordError(result.Err())
+		span.SetStatus(codes.Error, result.Err().Error())
 		return nil, fmt.Errorf("failed to execute release_seats script: %w", result.Err())
 	}
 
 	// Parse result
 	values, err := result.Slice()
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, fmt.Errorf("failed to parse script result: %w", err)
 	}
 
 	if len(values) < 3 {
+		span.SetStatus(codes.Error, "unexpected result length")
 		return nil, fmt.Errorf("unexpected script result length: %d", len(values))
 	}
 
@@ -201,6 +263,8 @@ func (r *RedisReservationRepository) ReleaseSeats(ctx context.Context, bookingID
 	if success == 1 {
 		availableSeats, _ := toInt64(values[1])
 		userReserved, _ := toInt64(values[2])
+		span.SetAttributes(attribute.Int64("available_seats", availableSeats))
+		span.SetStatus(codes.Ok, "")
 		return &ReleaseResult{
 			Success:        true,
 			AvailableSeats: availableSeats,
@@ -211,6 +275,8 @@ func (r *RedisReservationRepository) ReleaseSeats(ctx context.Context, bookingID
 	// Error case
 	errorCode, _ := values[1].(string)
 	errorMessage, _ := values[2].(string)
+	span.SetAttributes(attribute.String("error_code", errorCode))
+	span.SetStatus(codes.Error, errorCode)
 	return &ReleaseResult{
 		Success:      false,
 		ErrorCode:    errorCode,
@@ -220,59 +286,107 @@ func (r *RedisReservationRepository) ReleaseSeats(ctx context.Context, bookingID
 
 // GetZoneAvailability gets the current available seats for a zone
 func (r *RedisReservationRepository) GetZoneAvailability(ctx context.Context, zoneID string) (int64, error) {
+	ctx, span := telemetry.StartSpan(ctx, "repo.redis.reservation.get_zone_availability")
+	defer span.End()
+
+	span.SetAttributes(attribute.String("zone_id", zoneID))
+
 	key := fmt.Sprintf("zone:availability:%s", zoneID)
 	result, err := r.client.Get(ctx, key).Result()
 	if err != nil {
 		if err.Error() == "redis: nil" {
+			span.SetStatus(codes.Ok, "zone not found")
 			return 0, nil // Zone not found, return 0
 		}
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return 0, fmt.Errorf("failed to get zone availability: %w", err)
 	}
 
 	seats, err := strconv.ParseInt(result, 10, 64)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return 0, fmt.Errorf("failed to parse availability: %w", err)
 	}
 
+	span.SetAttributes(attribute.Int64("available_seats", seats))
+	span.SetStatus(codes.Ok, "")
 	return seats, nil
 }
 
 // SetZoneAvailability sets the available seats for a zone (for initialization)
 func (r *RedisReservationRepository) SetZoneAvailability(ctx context.Context, zoneID string, seats int64) error {
+	ctx, span := telemetry.StartSpan(ctx, "repo.redis.reservation.set_zone_availability")
+	defer span.End()
+
+	span.SetAttributes(
+		attribute.String("zone_id", zoneID),
+		attribute.Int64("seats", seats),
+	)
+
 	key := fmt.Sprintf("zone:availability:%s", zoneID)
 	err := r.client.Set(ctx, key, seats, 0).Err()
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return fmt.Errorf("failed to set zone availability: %w", err)
 	}
+
+	span.SetStatus(codes.Ok, "")
 	return nil
 }
 
 // GetReservation gets a reservation by booking ID
 func (r *RedisReservationRepository) GetReservation(ctx context.Context, bookingID string) (map[string]string, error) {
+	ctx, span := telemetry.StartSpan(ctx, "repo.redis.reservation.get")
+	defer span.End()
+
+	span.SetAttributes(attribute.String("booking_id", bookingID))
+
 	key := fmt.Sprintf("reservation:%s", bookingID)
 	result, err := r.client.HGetAll(ctx, key).Result()
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, fmt.Errorf("failed to get reservation: %w", err)
 	}
+
+	span.SetStatus(codes.Ok, "")
 	return result, nil
 }
 
 // GetUserReservedCount gets the total reserved count for a user on an event
 func (r *RedisReservationRepository) GetUserReservedCount(ctx context.Context, userID, eventID string) (int64, error) {
+	ctx, span := telemetry.StartSpan(ctx, "repo.redis.reservation.get_user_count")
+	defer span.End()
+
+	span.SetAttributes(
+		attribute.String("user_id", userID),
+		attribute.String("event_id", eventID),
+	)
+
 	key := fmt.Sprintf("user:reservations:%s:%s", userID, eventID)
 	result, err := r.client.Get(ctx, key).Result()
 	if err != nil {
 		if err.Error() == "redis: nil" {
+			span.SetStatus(codes.Ok, "no reservations")
 			return 0, nil
 		}
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return 0, fmt.Errorf("failed to get user reserved count: %w", err)
 	}
 
 	count, err := strconv.ParseInt(result, 10, 64)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return 0, fmt.Errorf("failed to parse reserved count: %w", err)
 	}
 
+	span.SetAttributes(attribute.Int64("count", count))
+	span.SetStatus(codes.Ok, "")
 	return count, nil
 }
 

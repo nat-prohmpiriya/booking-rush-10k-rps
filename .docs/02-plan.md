@@ -674,119 +674,91 @@ Content-Security-Policy: default-src 'self'
 
 ---
 
-## 7. Saga Pattern
-
 ### 7.1 Overview
-**Saga Pattern** is used for managing distributed transactions across services without using 2-phase commit.
+**Saga Pattern** is used for managing the post-payment confirmation workflow to ensure consistency between Payment and Booking services.
 
-**Why Saga?**
-- Microservices each have their own separate database
-- Need **Eventual Consistency** instead of Strong Consistency
-- If any step fails, must **Compensate** (rollback) previous steps
+**Architecture Decision:**
+We use a **Hybrid Approach** instead of a full lifecycle Saga to handle the 10k RPS requirement:
 
-**Decision:** Use **Orchestration-based Saga** because the flow has multiple steps and we need visibility.
+1.  **Reservation Phase (Fast Path):**
+    -   Uses Redis Lua Scripts for atomic locking.
+    -   Synchronous, extremely low latency.
+    -   No Saga overhead here to prevent bottlenecks during high traffic bursts.
 
-### 7.2 Booking Saga Flow
+2.  **Payment Phase (Client-Side):**
+    -   User completes payment directly with Stripe.
+    -   Booking has a TTL (e.g., 10 mins) in Redis.
+
+3.  **Confirmation Phase (Saga - Post-Payment):**
+    -   Triggered asynchronously via Webhook -> Kafka (`payment.success`).
+    -   Uses **Orchestration-based Saga** to finalize the booking.
+    -   Ensures "Eventual Consistency" between Payment (Paid) and Booking (Confirmed).
+
+### 7.2 Post-Payment Saga Flow
 
 ```
+User Action:      [Pay at Stripe] --> [Webhook] --> [Payment Service]
+                                                          |
+                                                          | (Produce 'payment.success')
+                                                          v
+                                                  +----------------+
+                                                  |  Kafka Topic   |
+                                                  +-------+--------+
+                                                          |
++=========================================================|=================+
+|                   BOOKING SAGA (Orchestrator)           v                 |
 +===========================================================================+
-|                        BOOKING SAGA (Orchestration)                        |
-+===========================================================================+
 |                                                                           |
-|   +-------------------------------------------------------------------+   |
-|   |                     HAPPY PATH (Success)                          |   |
-|   +-------------------------------------------------------------------+   |
+|   Step 1: Confirm Booking                                                 |
+|  +---------------------------+                                            |
+|  | Booking Service           |                                            |
+|  | - Update DB: 'CONFIRMED'  |                                            |
+|  | - Redis: Remove TTL       |                                            |
+|  |   (Make Permanent)        |                                            |
+|  +-------------+-------------+                                            |
+|                | [Success]                                                |
+|                v                                                          |
 |                                                                           |
-|   Step 1           Step 2           Step 3           Step 4              |
-|  +---------+      +---------+      +---------+      +---------+          |
-|  | Reserve |----->| Process |----->| Confirm |----->|  Send   |          |
-|  |  Seats  |      | Payment |      | Booking |      | Notif.  |          |
-|  | (Redis) |      |  (DB)   |      |  (DB)   |      |(MongoDB)|          |
-|  +---------+      +---------+      +---------+      +---------+          |
-|      [OK]            [OK]            [OK]             [OK]                |
-|                                                                           |
-|   +-------------------------------------------------------------------+   |
-|   |                   FAILURE PATH (Compensate)                       |   |
-|   +-------------------------------------------------------------------+   |
-|                                                                           |
-|   Step 1           Step 2                                                 |
-|  +---------+      +---------+                                             |
-|  | Reserve |----->| Process | [X] Payment Failed!                        |
-|  |  Seats  |      | Payment |                                             |
-|  +---------+      +---------+                                             |
-|      [OK]            [X]                                                  |
-|                       |                                                   |
-|                       v  Trigger Compensation                             |
-|                  +---------+                                              |
-|                  | Release | <-- Compensating Action                      |
-|                  |  Seats  |                                              |
-|                  | (Redis) |                                              |
-|                  +---------+                                              |
+|   Step 2: Send Notification                                               |
+|  +---------------------------+                                            |
+|  | Notification Service      |                                            |
+|  | - Send Email / SMS        |                                            |
+|  +---------------------------+                                            |
 |                                                                           |
 +===========================================================================+
 ```
 
 ### 7.3 Saga Steps Definition
 
-| Step | Action | Service | Compensating Action |
-|------|--------|---------|---------------------|
-| 1 | Reserve Seats | Booking Service | Release Seats |
-| 2 | Process Payment | Payment Service | Refund Payment |
-| 3 | Confirm Booking | Booking Service | Cancel Booking |
-| 4 | Send Notification | Notification Service | - (no compensation) |
+**Saga Name:** `post-payment-saga`
 
-### 7.4 Saga State Machine
+| Step | Action | Service | Compensating Action | Note |
+|------|--------|---------|---------------------|------|
+| 1 | `confirm-booking` | Booking Service | `release-seats` * | This makes the booking permanent. If it fails, we must refund & release. |
+| 2 | `send-notification` | Notification Service | - | Non-critical. Failure does NOT trigger rollback. |
 
-```
-                        +-------------------------------------+
-                        |                                     |
-                        v                                     |
-+----------+    +----------+    +----------+    +----------+  |
-| CREATED  |--->| RESERVED |--->|   PAID   |--->|CONFIRMED |  |
-+----------+    +----+-----+    +----+-----+    +----------+  |
-                     |               |                        |
-                     | fail          | fail                   |
-                     v               v                        |
-               +-----------+  +-----------+                   |
-               | RELEASING |  | REFUNDING |                   |
-               +-----+-----+  +-----+-----+                   |
-                     |               |                        |
-                     v               v                        |
-               +---------------------------+                  |
-               |          FAILED           |                  |
-               +---------------------------+                  |
-                     |                                        |
-                     | retry                                  |
-                     +----------------------------------------+
-```
+*Note: In the current implementation, `confirm-booking` is designed to be retried until success. Compensation (Refunding) happens only if the booking was already expired/released by the time payment arrived (race condition).*
 
-### 7.5 Kafka Events for Saga
+### 7.4 Kafka Events for Saga
 
-**Commands (Orchestrator -> Services):**
+**Trigger Event:**
+| Topic | Source | Description |
+|-------|--------|-------------|
+| `payment.success` | Payment Service | Webhook received, payment charged successfully. Starts the Saga. |
+
+**Internal Saga Commands:**
 | Topic | Description |
 |-------|-------------|
-| `saga.booking.reserve` | Command to reserve seats |
-| `saga.payment.process` | Command to process payment |
-| `saga.booking.confirm` | Command to confirm booking |
-| `saga.booking.release` | Compensation: release seats |
-| `saga.payment.refund` | Compensation: refund payment |
+| `saga.booking.confirm` | Orchestrator tells Booking Service to finalize the record. |
+| `saga.notification.send` | Orchestrator tells Notification Service to send email. |
 
-**Events (Services -> Orchestrator):**
-| Topic | Description |
-|-------|-------------|
-| `saga.booking.reserved` | Seats reserved successfully |
-| `saga.booking.reserve_failed` | Seat reservation failed |
-| `saga.payment.processed` | Payment successful |
-| `saga.payment.failed` | Payment failed |
+### 7.5 Saga Timeout & Retry
 
-### 7.6 Saga Timeout & Retry
-
-| Config | Value |
-|--------|-------|
-| Step Timeout | 30 seconds |
-| Saga Timeout | 5 minutes |
-| Max Retries | 3 |
-| Retry Backoff | Exponential (1s, 2s, 4s) |
+| Config | Value | Reason |
+|--------|-------|--------|
+| Step Timeout | 30 seconds | Fast fail to retry quickly. |
+| Saga Timeout | 1 minute | Post-payment processing should be fast. |
+| Max Retries | 3 | Handle transient network glitches. |
 
 ---
 

@@ -107,16 +107,20 @@ func main() {
 	router.Use(middleware.Logger(log))
 	router.Use(middleware.CORS())
 
-	// Configure per-endpoint rate limiting
-	rateLimitConfig := middleware.DefaultPerEndpointConfig()
-	if redis != nil {
-		rateLimitConfig.UseRedis = true
-		rateLimitConfig.RedisClient = redis
-		log.Info("Rate limiting enabled (Redis-backed, distributed)")
+	// Configure per-endpoint rate limiting (can be disabled via ENV for load testing)
+	if os.Getenv("RATE_LIMIT_ENABLED") != "false" {
+		rateLimitConfig := middleware.DefaultPerEndpointConfig()
+		if redis != nil {
+			rateLimitConfig.UseRedis = true
+			rateLimitConfig.RedisClient = redis
+			log.Info("Rate limiting enabled (Redis-backed, distributed)")
+		} else {
+			log.Info("Rate limiting enabled (local, non-distributed)")
+		}
+		router.Use(middleware.PerEndpointRateLimiter(rateLimitConfig))
 	} else {
-		log.Info("Rate limiting enabled (local, non-distributed)")
+		log.Warn("Rate limiting DISABLED (RATE_LIMIT_ENABLED=false)")
 	}
-	router.Use(middleware.PerEndpointRateLimiter(rateLimitConfig))
 
 	// Health check handlers (no database - microservice pattern)
 	healthHandler := handler.NewHealthHandler(nil, redis)

@@ -8,6 +8,9 @@ import (
 	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking/internal/domain"
 	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking/internal/dto"
 	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking/internal/service"
+	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/telemetry"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 )
 
 // QueueHandler handles queue HTTP requests
@@ -24,8 +27,13 @@ func NewQueueHandler(queueService service.QueueService) *QueueHandler {
 
 // JoinQueue handles POST /queue/join
 func (h *QueueHandler) JoinQueue(c *gin.Context) {
+	ctx, span := telemetry.StartSpan(c.Request.Context(), "handler.queue.join")
+	defer span.End()
+	c.Request = c.Request.WithContext(ctx)
+
 	userID := c.GetString("user_id")
 	if userID == "" {
+		span.SetStatus(codes.Error, "unauthorized")
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse{
 			Error: "unauthorized",
 			Code:  "UNAUTHORIZED",
@@ -35,6 +43,8 @@ func (h *QueueHandler) JoinQueue(c *gin.Context) {
 
 	var req dto.JoinQueueRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "invalid request")
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
 			Error:   "invalid request",
 			Code:    "INVALID_REQUEST",
@@ -43,19 +53,32 @@ func (h *QueueHandler) JoinQueue(c *gin.Context) {
 		return
 	}
 
-	result, err := h.queueService.JoinQueue(c.Request.Context(), userID, &req)
+	span.SetAttributes(
+		attribute.String("user_id", userID),
+		attribute.String("event_id", req.EventID),
+	)
+
+	result, err := h.queueService.JoinQueue(ctx, userID, &req)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		h.handleError(c, err)
 		return
 	}
 
+	span.SetStatus(codes.Ok, "")
 	c.JSON(http.StatusCreated, result)
 }
 
 // GetPosition handles GET /queue/position/:event_id
 func (h *QueueHandler) GetPosition(c *gin.Context) {
+	ctx, span := telemetry.StartSpan(c.Request.Context(), "handler.queue.position")
+	defer span.End()
+	c.Request = c.Request.WithContext(ctx)
+
 	userID := c.GetString("user_id")
 	if userID == "" {
+		span.SetStatus(codes.Error, "unauthorized")
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse{
 			Error: "unauthorized",
 			Code:  "UNAUTHORIZED",
@@ -65,6 +88,7 @@ func (h *QueueHandler) GetPosition(c *gin.Context) {
 
 	eventID := c.Param("event_id")
 	if eventID == "" {
+		span.SetStatus(codes.Error, "event_id required")
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
 			Error: "event_id required",
 			Code:  "INVALID_REQUEST",
@@ -72,19 +96,32 @@ func (h *QueueHandler) GetPosition(c *gin.Context) {
 		return
 	}
 
-	result, err := h.queueService.GetPosition(c.Request.Context(), userID, eventID)
+	span.SetAttributes(
+		attribute.String("user_id", userID),
+		attribute.String("event_id", eventID),
+	)
+
+	result, err := h.queueService.GetPosition(ctx, userID, eventID)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		h.handleError(c, err)
 		return
 	}
 
+	span.SetStatus(codes.Ok, "")
 	c.JSON(http.StatusOK, result)
 }
 
 // LeaveQueue handles DELETE /queue/leave
 func (h *QueueHandler) LeaveQueue(c *gin.Context) {
+	ctx, span := telemetry.StartSpan(c.Request.Context(), "handler.queue.leave")
+	defer span.End()
+	c.Request = c.Request.WithContext(ctx)
+
 	userID := c.GetString("user_id")
 	if userID == "" {
+		span.SetStatus(codes.Error, "unauthorized")
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse{
 			Error: "unauthorized",
 			Code:  "UNAUTHORIZED",
@@ -94,6 +131,8 @@ func (h *QueueHandler) LeaveQueue(c *gin.Context) {
 
 	var req dto.LeaveQueueRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "invalid request")
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
 			Error:   "invalid request",
 			Code:    "INVALID_REQUEST",
@@ -102,19 +141,32 @@ func (h *QueueHandler) LeaveQueue(c *gin.Context) {
 		return
 	}
 
-	result, err := h.queueService.LeaveQueue(c.Request.Context(), userID, &req)
+	span.SetAttributes(
+		attribute.String("user_id", userID),
+		attribute.String("event_id", req.EventID),
+	)
+
+	result, err := h.queueService.LeaveQueue(ctx, userID, &req)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		h.handleError(c, err)
 		return
 	}
 
+	span.SetStatus(codes.Ok, "")
 	c.JSON(http.StatusOK, result)
 }
 
 // GetQueueStatus handles GET /queue/status/:event_id
 func (h *QueueHandler) GetQueueStatus(c *gin.Context) {
+	ctx, span := telemetry.StartSpan(c.Request.Context(), "handler.queue.status")
+	defer span.End()
+	c.Request = c.Request.WithContext(ctx)
+
 	eventID := c.Param("event_id")
 	if eventID == "" {
+		span.SetStatus(codes.Error, "event_id required")
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
 			Error: "event_id required",
 			Code:  "INVALID_REQUEST",
@@ -122,12 +174,17 @@ func (h *QueueHandler) GetQueueStatus(c *gin.Context) {
 		return
 	}
 
-	result, err := h.queueService.GetQueueStatus(c.Request.Context(), eventID)
+	span.SetAttributes(attribute.String("event_id", eventID))
+
+	result, err := h.queueService.GetQueueStatus(ctx, eventID)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		h.handleError(c, err)
 		return
 	}
 
+	span.SetStatus(codes.Ok, "")
 	c.JSON(http.StatusOK, result)
 }
 

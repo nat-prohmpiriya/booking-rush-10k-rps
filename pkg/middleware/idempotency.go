@@ -22,8 +22,8 @@ const (
 	IdempotencyKeyHeader = "X-Idempotency-Key"
 	// ContextKeyIdempotencyKey is the context key for idempotency key
 	ContextKeyIdempotencyKey = "idempotency_key"
-	// Default TTL for idempotency records (24 hours)
-	DefaultIdempotencyTTL = 24 * time.Hour
+	// Default TTL for idempotency records (5 minutes - short-lived for network retries)
+	DefaultIdempotencyTTL = 5 * time.Minute
 	// Redis key prefix for idempotency
 	IdempotencyKeyPrefix = "idempotency:"
 )

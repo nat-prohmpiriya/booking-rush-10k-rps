@@ -41,6 +41,9 @@ type QueueRepository interface {
 	// StoreQueuePass stores the queue pass token in Redis with TTL
 	StoreQueuePass(ctx context.Context, eventID, userID, queuePass string, ttl int) error
 
+	// GetQueuePass retrieves the queue pass for a user (if exists)
+	GetQueuePass(ctx context.Context, eventID, userID string) (string, error)
+
 	// ValidateQueuePass validates if the queue pass is valid and not expired
 	ValidateQueuePass(ctx context.Context, eventID, userID, queuePass string) (bool, error)
 

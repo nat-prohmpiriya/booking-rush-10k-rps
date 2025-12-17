@@ -160,14 +160,14 @@ func (h *TimeoutHandler) checkTimeouts(ctx context.Context) {
 }
 
 func (h *TimeoutHandler) handleExpiredTimeout(ctx context.Context, check *TimeoutCheck) {
-	h.logger.Warn("Step timeout expired",
+	h.logger.WarnContext(ctx, "Step timeout expired",
 		"saga_id", check.SagaID,
 		"step_name", check.StepName)
 
 	// Get saga instance to check current status
 	instance, err := h.store.Get(ctx, check.SagaID)
 	if err != nil {
-		h.logger.Error("Failed to get saga instance for timeout",
+		h.logger.ErrorContext(ctx, "Failed to get saga instance for timeout",
 			"saga_id", check.SagaID,
 			"error", err)
 		return
@@ -175,7 +175,7 @@ func (h *TimeoutHandler) handleExpiredTimeout(ctx context.Context, check *Timeou
 
 	// Only handle timeout if saga is still running
 	if instance.Status != pkgsaga.StatusRunning {
-		h.logger.Info("Saga is not running, skipping timeout",
+		h.logger.InfoContext(ctx, "Saga is not running, skipping timeout",
 			"saga_id", check.SagaID,
 			"status", instance.Status)
 		return
@@ -184,7 +184,7 @@ func (h *TimeoutHandler) handleExpiredTimeout(ctx context.Context, check *Timeou
 	// Check if the step was already completed
 	for _, result := range instance.StepResults {
 		if result.StepName == check.StepName && result.Status == pkgsaga.StepStatusCompleted {
-			h.logger.Info("Step already completed, skipping timeout",
+			h.logger.InfoContext(ctx, "Step already completed, skipping timeout",
 				"saga_id", check.SagaID,
 				"step_name", check.StepName)
 			return
@@ -201,7 +201,7 @@ func (h *TimeoutHandler) triggerTimeoutCompensation(ctx context.Context, check *
 	instance.SetError(fmt.Errorf("step %s timed out after %s", check.StepName, time.Since(check.TimeoutAt.Add(-time.Since(check.TimeoutAt)))))
 
 	if err := h.store.Update(ctx, instance); err != nil {
-		h.logger.Error("Failed to update saga status",
+		h.logger.ErrorContext(ctx, "Failed to update saga status",
 			"saga_id", instance.ID,
 			"error", err)
 	}
@@ -219,7 +219,7 @@ func (h *TimeoutHandler) triggerTimeoutCompensation(ctx context.Context, check *
 	)
 
 	if err := h.producer.SendStepFailureEvent(ctx, failureEvent); err != nil {
-		h.logger.Error("Failed to send timeout failure event",
+		h.logger.ErrorContext(ctx, "Failed to send timeout failure event",
 			"saga_id", check.SagaID,
 			"error", err)
 	}
@@ -232,7 +232,7 @@ func (h *TimeoutHandler) triggerTimeoutCompensation(ctx context.Context, check *
 		instance.CreatedAt,
 	)
 	if err := h.producer.SendSagaFailedEvent(ctx, sagaFailedEvent); err != nil {
-		h.logger.Error("Failed to send saga failed event",
+		h.logger.ErrorContext(ctx, "Failed to send saga failed event",
 			"saga_id", check.SagaID,
 			"error", err)
 	}
@@ -248,7 +248,7 @@ func (h *TimeoutHandler) sendCompensationCommands(ctx context.Context, check *Ti
 
 	def, err := h.orchestrator.GetDefinition(instance.DefinitionID)
 	if err != nil {
-		h.logger.Error("Failed to get saga definition",
+		h.logger.ErrorContext(ctx, "Failed to get saga definition",
 			"saga_id", instance.ID,
 			"error", err)
 		return
@@ -287,7 +287,7 @@ func (h *TimeoutHandler) sendCompensationCommands(ctx context.Context, check *Ti
 		)
 
 		if err := h.producer.SendCompensationCommand(ctx, command); err != nil {
-			h.logger.Error("Failed to send compensation command",
+			h.logger.ErrorContext(ctx, "Failed to send compensation command",
 				"saga_id", instance.ID,
 				"step_name", step.Name,
 				"error", err)
@@ -300,7 +300,7 @@ func (h *TimeoutHandler) sendCompensationCommands(ctx context.Context, check *Ti
 	instance.CompletedAt = &now
 
 	if err := h.store.Update(ctx, instance); err != nil {
-		h.logger.Error("Failed to update saga to compensated",
+		h.logger.ErrorContext(ctx, "Failed to update saga to compensated",
 			"saga_id", instance.ID,
 			"error", err)
 	}
@@ -313,7 +313,7 @@ func (h *TimeoutHandler) sendCompensationCommands(ctx context.Context, check *Ti
 		instance.CreatedAt,
 	)
 	if err := h.producer.SendSagaCompensatedEvent(ctx, compensatedEvent); err != nil {
-		h.logger.Error("Failed to send saga compensated event",
+		h.logger.ErrorContext(ctx, "Failed to send saga compensated event",
 			"saga_id", check.SagaID,
 			"error", err)
 	}

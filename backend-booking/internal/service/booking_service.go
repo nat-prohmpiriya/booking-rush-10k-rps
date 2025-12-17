@@ -9,7 +9,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking/internal/domain"
 	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking/internal/dto"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking/internal/metrics"
 	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking/internal/repository"
+	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/telemetry"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // BookingService defines the interface for booking business logic
@@ -99,25 +104,42 @@ func NewBookingService(
 
 // ReserveSeats reserves seats for a user with idempotency support
 func (s *bookingService) ReserveSeats(ctx context.Context, userID string, req *dto.ReserveSeatsRequest) (*dto.ReserveSeatsResponse, error) {
+	ctx, span := telemetry.StartSpan(ctx, "service.booking.reserve_seats")
+	defer span.End()
+
 	// Validate request
 	if req == nil {
+		span.SetStatus(codes.Error, "invalid quantity")
 		return nil, domain.ErrInvalidQuantity
 	}
 	if req.Quantity <= 0 {
+		span.SetStatus(codes.Error, "invalid quantity")
 		return nil, domain.ErrInvalidQuantity
 	}
 	if req.EventID == "" {
+		span.SetStatus(codes.Error, "invalid event_id")
 		return nil, domain.ErrInvalidEventID
 	}
 	if req.ZoneID == "" {
+		span.SetStatus(codes.Error, "invalid zone_id")
 		return nil, domain.ErrInvalidZoneID
 	}
 	if userID == "" {
+		span.SetStatus(codes.Error, "invalid user_id")
 		return nil, domain.ErrInvalidUserID
 	}
 	if req.ShowID == "" {
+		span.SetStatus(codes.Error, "invalid show_id")
 		return nil, domain.ErrInvalidShowID
 	}
+
+	span.SetAttributes(
+		attribute.String("user_id", userID),
+		attribute.String("event_id", req.EventID),
+		attribute.String("zone_id", req.ZoneID),
+		attribute.String("show_id", req.ShowID),
+		attribute.Int("quantity", req.Quantity),
+	)
 
 	// Get tenant_id from show if not provided in request
 	tenantID := req.TenantID
@@ -235,17 +257,29 @@ createBooking:
 	if err := s.bookingRepo.Create(ctx, booking); err != nil {
 		// If PostgreSQL insert fails, we should release Redis reservation
 		// But for now, let Redis TTL handle cleanup
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 
-	// Publish booking created event (async, don't block on failure)
-	go func() {
-		if pubErr := s.eventPublisher.PublishBookingCreated(context.Background(), booking); pubErr != nil {
-			// Log error but don't fail the request
-			// TODO: Add proper logging
-		}
-	}()
+	// Publish booking created event (ProduceAsync is non-blocking, no need for extra goroutine)
+	_ = s.eventPublisher.PublishBookingCreated(ctx, booking)
 
+	// Record metrics
+	metrics.RecordReservation(ctx, booking.EventID, userID, booking.ZoneID, booking.Quantity)
+
+	// Add span event for reservation created
+	span.AddEvent("reservation_created", trace.WithAttributes(
+		attribute.String("booking_id", booking.ID),
+		attribute.String("event_id", booking.EventID),
+		attribute.String("zone_id", booking.ZoneID),
+		attribute.Int("quantity", booking.Quantity),
+		attribute.Float64("total_price", booking.TotalPrice),
+		attribute.String("status", string(booking.Status)),
+	))
+
+	span.SetAttributes(attribute.String("booking_id", booking.ID))
+	span.SetStatus(codes.Ok, "")
 	return &dto.ReserveSeatsResponse{
 		BookingID:  booking.ID,
 		Status:     string(booking.Status),
@@ -256,33 +290,49 @@ createBooking:
 
 // ConfirmBooking confirms a reservation with payment
 func (s *bookingService) ConfirmBooking(ctx context.Context, bookingID, userID string, req *dto.ConfirmBookingRequest) (*dto.ConfirmBookingResponse, error) {
+	ctx, span := telemetry.StartSpan(ctx, "service.booking.confirm")
+	defer span.End()
+
+	span.SetAttributes(
+		attribute.String("booking_id", bookingID),
+		attribute.String("user_id", userID),
+	)
+
 	// Validate inputs
 	if bookingID == "" {
+		span.SetStatus(codes.Error, "invalid booking_id")
 		return nil, domain.ErrInvalidBookingID
 	}
 	if userID == "" {
+		span.SetStatus(codes.Error, "invalid user_id")
 		return nil, domain.ErrInvalidUserID
 	}
 
 	// Get booking from PostgreSQL
 	booking, err := s.bookingRepo.GetByID(ctx, bookingID)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 
 	// Verify ownership
 	if !booking.BelongsToUser(userID) {
+		span.SetStatus(codes.Error, "invalid user")
 		return nil, domain.ErrInvalidUserID
 	}
 
 	// Check if booking can be confirmed
 	if booking.IsConfirmed() {
+		span.SetStatus(codes.Error, "already confirmed")
 		return nil, domain.ErrAlreadyConfirmed
 	}
 	if booking.IsCancelled() {
+		span.SetStatus(codes.Error, "already released")
 		return nil, domain.ErrAlreadyReleased
 	}
 	if booking.IsExpired() {
+		span.SetStatus(codes.Error, "booking expired")
 		return nil, domain.ErrBookingExpired
 	}
 
@@ -294,26 +344,35 @@ func (s *bookingService) ConfirmBooking(ctx context.Context, bookingID, userID s
 	// Confirm in Redis first
 	redisResult, err := s.reservationRepo.ConfirmBooking(ctx, bookingID, userID, paymentID)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 
 	if !redisResult.Success {
 		switch redisResult.ErrorCode {
 		case "RESERVATION_NOT_FOUND":
+			span.SetStatus(codes.Error, "reservation not found")
 			return nil, domain.ErrReservationNotFound
 		case "INVALID_USER":
+			span.SetStatus(codes.Error, "invalid user")
 			return nil, domain.ErrInvalidUserID
 		case "ALREADY_CONFIRMED":
+			span.SetStatus(codes.Error, "already confirmed")
 			return nil, domain.ErrAlreadyConfirmed
 		case "RESERVATION_EXPIRED":
+			span.SetStatus(codes.Error, "reservation expired")
 			return nil, domain.ErrReservationExpired
 		default:
+			span.SetStatus(codes.Error, "invalid booking status")
 			return nil, domain.ErrInvalidBookingStatus
 		}
 	}
 
 	// Update booking in PostgreSQL
 	if err := s.bookingRepo.Confirm(ctx, bookingID, paymentID); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 
@@ -335,6 +394,19 @@ func (s *bookingService) ConfirmBooking(ctx context.Context, bookingID, userID s
 		}
 	}()
 
+	// Record metrics
+	durationSeconds := now.Sub(booking.ReservedAt).Seconds()
+	metrics.RecordConfirmation(ctx, booking.EventID, userID, durationSeconds)
+
+	// Add span event for booking confirmed
+	span.AddEvent("booking_confirmed", trace.WithAttributes(
+		attribute.String("booking_id", bookingID),
+		attribute.String("payment_id", paymentID),
+		attribute.String("confirmation_code", confirmationCode),
+		attribute.Float64("duration_seconds", durationSeconds),
+	))
+
+	span.SetStatus(codes.Ok, "")
 	return &dto.ConfirmBookingResponse{
 		BookingID:        bookingID,
 		Status:           "confirmed",
@@ -345,36 +417,53 @@ func (s *bookingService) ConfirmBooking(ctx context.Context, bookingID, userID s
 
 // CancelBooking cancels a reservation
 func (s *bookingService) CancelBooking(ctx context.Context, bookingID, userID string) (*dto.ReleaseBookingResponse, error) {
+	ctx, span := telemetry.StartSpan(ctx, "service.booking.cancel")
+	defer span.End()
+
+	span.SetAttributes(
+		attribute.String("booking_id", bookingID),
+		attribute.String("user_id", userID),
+	)
+
 	// Validate inputs
 	if bookingID == "" {
+		span.SetStatus(codes.Error, "invalid booking_id")
 		return nil, domain.ErrInvalidBookingID
 	}
 	if userID == "" {
+		span.SetStatus(codes.Error, "invalid user_id")
 		return nil, domain.ErrInvalidUserID
 	}
 
 	// Get booking from PostgreSQL
 	booking, err := s.bookingRepo.GetByID(ctx, bookingID)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 
 	// Verify ownership
 	if !booking.BelongsToUser(userID) {
+		span.SetStatus(codes.Error, "invalid user")
 		return nil, domain.ErrInvalidUserID
 	}
 
 	// Check if booking can be cancelled
 	if booking.IsConfirmed() {
+		span.SetStatus(codes.Error, "already confirmed")
 		return nil, domain.ErrAlreadyConfirmed
 	}
 	if booking.IsCancelled() {
+		span.SetStatus(codes.Error, "already released")
 		return nil, domain.ErrAlreadyReleased
 	}
 
 	// Release seats in Redis
 	releaseResult, err := s.reservationRepo.ReleaseSeats(ctx, bookingID, userID)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 
@@ -384,14 +473,18 @@ func (s *bookingService) CancelBooking(ctx context.Context, bookingID, userID st
 			// If not found in Redis, it might have expired
 			// Still proceed to cancel in PostgreSQL
 		case "INVALID_USER":
+			span.SetStatus(codes.Error, "invalid user")
 			return nil, domain.ErrInvalidUserID
 		case "ALREADY_RELEASED":
+			span.SetStatus(codes.Error, "already released")
 			return nil, domain.ErrAlreadyReleased
 		}
 	}
 
 	// Cancel in PostgreSQL
 	if err := s.bookingRepo.Cancel(ctx, bookingID); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 
@@ -408,6 +501,17 @@ func (s *bookingService) CancelBooking(ctx context.Context, bookingID, userID st
 		}
 	}()
 
+	// Record metrics
+	metrics.RecordCancellation(ctx, booking.EventID)
+
+	// Add span event for booking cancelled
+	span.AddEvent("booking_cancelled", trace.WithAttributes(
+		attribute.String("booking_id", bookingID),
+		attribute.String("event_id", booking.EventID),
+		attribute.Int("quantity", booking.Quantity),
+	))
+
+	span.SetStatus(codes.Ok, "")
 	return &dto.ReleaseBookingResponse{
 		BookingID: bookingID,
 		Status:    "cancelled",
@@ -422,31 +526,55 @@ func (s *bookingService) ReleaseBooking(ctx context.Context, bookingID, userID s
 
 // GetBooking retrieves a booking by ID
 func (s *bookingService) GetBooking(ctx context.Context, bookingID, userID string) (*dto.BookingResponse, error) {
+	ctx, span := telemetry.StartSpan(ctx, "service.booking.get")
+	defer span.End()
+
+	span.SetAttributes(
+		attribute.String("booking_id", bookingID),
+		attribute.String("user_id", userID),
+	)
+
 	// Validate inputs
 	if bookingID == "" {
+		span.SetStatus(codes.Error, "invalid booking_id")
 		return nil, domain.ErrInvalidBookingID
 	}
 	if userID == "" {
+		span.SetStatus(codes.Error, "invalid user_id")
 		return nil, domain.ErrInvalidUserID
 	}
 
 	booking, err := s.bookingRepo.GetByID(ctx, bookingID)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 
 	// Verify ownership
 	if !booking.BelongsToUser(userID) {
+		span.SetStatus(codes.Error, "invalid user")
 		return nil, domain.ErrInvalidUserID
 	}
 
+	span.SetStatus(codes.Ok, "")
 	return dto.FromDomain(booking), nil
 }
 
 // GetUserBookings retrieves all bookings for a user
 func (s *bookingService) GetUserBookings(ctx context.Context, userID string, page, pageSize int) (*dto.PaginatedResponse, error) {
+	ctx, span := telemetry.StartSpan(ctx, "service.booking.list_user")
+	defer span.End()
+
+	span.SetAttributes(
+		attribute.String("user_id", userID),
+		attribute.Int("page", page),
+		attribute.Int("page_size", pageSize),
+	)
+
 	// Validate input
 	if userID == "" {
+		span.SetStatus(codes.Error, "invalid user_id")
 		return nil, domain.ErrInvalidUserID
 	}
 
@@ -460,6 +588,8 @@ func (s *bookingService) GetUserBookings(ctx context.Context, userID string, pag
 	offset := (page - 1) * pageSize
 	bookings, err := s.bookingRepo.GetByUserID(ctx, userID, pageSize+1, offset) // Fetch one extra to check if there are more
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 
@@ -473,6 +603,8 @@ func (s *bookingService) GetUserBookings(ctx context.Context, userID string, pag
 		responses[i] = dto.FromDomain(b)
 	}
 
+	span.SetAttributes(attribute.Int("count", len(responses)))
+	span.SetStatus(codes.Ok, "")
 	return &dto.PaginatedResponse{
 		Data:     responses,
 		Page:     page,
@@ -482,17 +614,29 @@ func (s *bookingService) GetUserBookings(ctx context.Context, userID string, pag
 
 // GetUserBookingSummary retrieves user's booking summary for an event
 func (s *bookingService) GetUserBookingSummary(ctx context.Context, userID, eventID string) (*dto.UserBookingSummaryResponse, error) {
+	ctx, span := telemetry.StartSpan(ctx, "service.booking.summary")
+	defer span.End()
+
+	span.SetAttributes(
+		attribute.String("user_id", userID),
+		attribute.String("event_id", eventID),
+	)
+
 	// Validate inputs
 	if userID == "" {
+		span.SetStatus(codes.Error, "invalid user_id")
 		return nil, domain.ErrInvalidUserID
 	}
 	if eventID == "" {
+		span.SetStatus(codes.Error, "invalid event_id")
 		return nil, domain.ErrInvalidEventID
 	}
 
 	// Get count from PostgreSQL (confirmed + reserved bookings)
 	bookedCount, err := s.bookingRepo.CountByUserAndEvent(ctx, userID, eventID)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 
@@ -503,6 +647,11 @@ func (s *bookingService) GetUserBookingSummary(ctx context.Context, userID, even
 		remainingSlots = 0
 	}
 
+	span.SetAttributes(
+		attribute.Int("booked_count", bookedCount),
+		attribute.Int("remaining_slots", remainingSlots),
+	)
+	span.SetStatus(codes.Ok, "")
 	return &dto.UserBookingSummaryResponse{
 		UserID:         userID,
 		EventID:        eventID,
@@ -514,12 +663,19 @@ func (s *bookingService) GetUserBookingSummary(ctx context.Context, userID, even
 
 // GetPendingBookings retrieves pending reservations (reserved status)
 func (s *bookingService) GetPendingBookings(ctx context.Context, limit int) ([]*dto.BookingResponse, error) {
+	ctx, span := telemetry.StartSpan(ctx, "service.booking.get_pending")
+	defer span.End()
+
 	if limit <= 0 {
 		limit = 100
 	}
 
+	span.SetAttributes(attribute.Int("limit", limit))
+
 	bookings, err := s.bookingRepo.GetExpiredReservations(ctx, limit)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 
@@ -528,18 +684,27 @@ func (s *bookingService) GetPendingBookings(ctx context.Context, limit int) ([]*
 		responses[i] = dto.FromDomain(b)
 	}
 
+	span.SetAttributes(attribute.Int("count", len(responses)))
+	span.SetStatus(codes.Ok, "")
 	return responses, nil
 }
 
 // ExpireReservations marks expired reservations as expired
 func (s *bookingService) ExpireReservations(ctx context.Context, limit int) (int, error) {
+	ctx, span := telemetry.StartSpan(ctx, "service.booking.expire_reservations")
+	defer span.End()
+
 	if limit <= 0 {
 		limit = 100
 	}
 
+	span.SetAttributes(attribute.Int("limit", limit))
+
 	// Get expired reservations
 	bookings, err := s.bookingRepo.GetExpiredReservations(ctx, limit)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return 0, err
 	}
 
@@ -564,6 +729,13 @@ func (s *bookingService) ExpireReservations(ctx context.Context, limit int) (int
 		expiredCount++
 	}
 
+	// Record metrics
+	if expiredCount > 0 {
+		metrics.RecordExpiration(ctx, "", int64(expiredCount))
+	}
+
+	span.SetAttributes(attribute.Int("expired_count", expiredCount))
+	span.SetStatus(codes.Ok, "")
 	return expiredCount, nil
 }
 

@@ -14,6 +14,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking/internal/di"
+	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking/internal/handler"
 	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking/internal/repository"
 	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking/internal/saga"
 	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking/internal/service"
@@ -129,6 +130,7 @@ func main() {
 		Topic:       "booking-events",
 		ServiceName: "booking-service",
 		ClientID:    cfg.Kafka.ClientID,
+		Logger:      service.NewZapLoggerAdapter(appLog),
 	}
 	eventPublisher, err = service.NewKafkaEventPublisher(ctx, eventPubCfg)
 	if err != nil {
@@ -182,6 +184,21 @@ func main() {
 	appLog.Info("Booking service using FAST PATH for reservations (Redis Lua + PostgreSQL)")
 
 	// Build dependency injection container
+	// Use config values for MaxPerUser and ReservationTTL (from env: MAX_TICKETS_PER_USER, RESERVATION_TTL_MINUTES)
+	maxPerUser := cfg.Booking.MaxTicketsPerUser
+	if maxPerUser <= 0 {
+		maxPerUser = 10 // Default fallback
+	}
+	reservationTTL := time.Duration(cfg.Booking.ReservationTTLMinutes) * time.Minute
+	if reservationTTL <= 0 {
+		reservationTTL = 10 * time.Minute // Default fallback
+	}
+	appLog.Info(fmt.Sprintf("Booking config: MaxPerUser=%d, ReservationTTL=%v", maxPerUser, reservationTTL))
+
+	// Log queue pass requirement setting
+	requireQueuePass := cfg.Booking.RequireQueuePass
+	appLog.Info(fmt.Sprintf("Virtual Queue: RequireQueuePass=%v", requireQueuePass))
+
 	container := di.NewContainer(&di.ContainerConfig{
 		DB:              db,
 		Redis:           redisClient,
@@ -190,8 +207,8 @@ func main() {
 		QueueRepo:       queueRepo,
 		EventPublisher:  eventPublisher,
 		ServiceConfig: &service.BookingServiceConfig{
-			ReservationTTL: 10 * time.Minute,
-			MaxPerUser:     10,
+			ReservationTTL: reservationTTL,
+			MaxPerUser:     maxPerUser,
 		},
 		QueueServiceConfig: &service.QueueServiceConfig{
 			QueueTTL:             30 * time.Minute,
@@ -205,6 +222,9 @@ func main() {
 		SagaServiceConfig: &service.SagaServiceConfig{
 			StepTimeout: 30 * time.Second,
 			MaxRetries:  2,
+		},
+		BookingHandlerConfig: &handler.BookingHandlerConfig{
+			RequireQueuePass: requireQueuePass,
 		},
 	})
 

@@ -15,6 +15,7 @@ type ReserveSeatsRequest struct {
 	Quantity       int     `json:"quantity" binding:"required,min=1,max=10"`
 	UnitPrice      float64 `json:"unit_price,omitempty"`
 	IdempotencyKey string  `json:"idempotency_key,omitempty"`
+	QueuePass      string  `json:"queue_pass,omitempty"` // JWT token from virtual queue
 }
 
 // ReserveSeatsResponse represents response after reserving seats

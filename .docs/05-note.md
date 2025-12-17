@@ -109,3 +109,64 @@ stripe listen --forward-to localhost:8080/api/v1/webhooks/stripe
   - Expiration: อนาคตใดก็ได้ เช่น 12/26
   - CVC: เลข 3 หลักใดก็ได้ เช่น 123
   - ZIP: เลขใดก็ได้ เช่น 10110
+
+# ============================================================
+# INFRASTRUCTURE NOTES
+# ============================================================
+
+## Kafka/Redpanda Topics
+
+### Required Topics
+ต้องสร้าง Kafka topics ก่อน deploy หรือก่อนรัน load test:
+
+```bash
+# สร้าง booking-events topic
+docker exec booking-rush-redpanda rpk topic create booking-events --partitions 3 --replicas 1
+
+# ตรวจสอบ topics
+docker exec booking-rush-redpanda rpk topic list
+```
+
+### ทำไมต้องสร้างเอง?
+แม้ว่า `auto_create_topics_enabled = true` แต่:
+1. **Producer timeout** - franz-go library พยายาม 4 ครั้งแล้วหยุด ก่อนที่ Redpanda จะ auto-create เสร็จ
+2. **Race condition** - หลาย requests พยายาม create พร้อมกัน → metadata refresh ช้า
+3. **Best Practice** - Production ควรสร้าง topic ล่วงหน้า (pre-create) เพื่อกำหนด partitions/replicas
+
+### Error ที่เจอถ้าไม่มี topic:
+```
+UNKNOWN_TOPIC_OR_PARTITION: This server does not host this topic-partition
+```
+
+### Topics ที่ต้องมี:
+| Topic | Partitions | Replicas | Description |
+|-------|------------|----------|-------------|
+| booking-events | 3 | 1 | Booking lifecycle events (created, confirmed, cancelled, expired) |
+
+## Redis Sync
+
+หลังจาก reset หรือ restart ต้อง sync inventory จาก DB → Redis:
+
+```bash
+# Login เป็น organizer
+curl -s http://localhost:8080/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"organizer@test.com","password":"Test123!"}' | jq
+
+# Sync inventory (ใช้ token จาก login)
+curl -s -X POST http://localhost:8080/api/v1/admin/sync-inventory \
+  -H "Authorization: Bearer <TOKEN>" \
+  -H "Content-Type: application/json"
+```
+
+### ตรวจสอบ sync status:
+```bash
+# เช็ค Redis
+docker exec booking-rush-redis redis-cli -a redis123 GET "zone:availability:b0000000-0000-0001-0001-000000000000"
+
+# เช็ค DB
+docker exec booking-rush-postgres psql -U postgres -d ticket_db -c \
+  "SELECT available_seats FROM seat_zones WHERE id = 'b0000000-0000-0001-0001-000000000000';"
+```
+
+ค่าทั้งสองต้องตรงกัน (เช่น 250000)

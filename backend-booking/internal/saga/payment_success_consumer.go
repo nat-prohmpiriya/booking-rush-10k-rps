@@ -140,7 +140,7 @@ func (c *PaymentSuccessConsumer) Start(ctx context.Context) error {
 
 		if errs := fetches.Errors(); len(errs) > 0 {
 			for _, err := range errs {
-				c.logger.Error(fmt.Sprintf("Fetch error: topic=%s, partition=%d, err=%v",
+				c.logger.ErrorContext(ctx, fmt.Sprintf("Fetch error: topic=%s, partition=%d, err=%v",
 					err.Topic, err.Partition, err.Err))
 			}
 			continue
@@ -151,14 +151,14 @@ func (c *PaymentSuccessConsumer) Start(ctx context.Context) error {
 			go func(r *kgo.Record) {
 				defer c.wg.Done()
 				if err := c.processRecord(ctx, r); err != nil {
-					c.logger.Error(fmt.Sprintf("Failed to process record: %v", err))
+					c.logger.ErrorContext(ctx, fmt.Sprintf("Failed to process record: %v", err))
 				}
 			}(record)
 		})
 
 		// Commit after processing
 		if err := c.client.CommitUncommittedOffsets(ctx); err != nil {
-			c.logger.Error(fmt.Sprintf("Failed to commit offsets: %v", err))
+			c.logger.ErrorContext(ctx, fmt.Sprintf("Failed to commit offsets: %v", err))
 		}
 	}
 }

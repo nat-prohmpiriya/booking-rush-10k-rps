@@ -139,7 +139,7 @@ func (c *BookingConsumer) poll(ctx context.Context, recordsCh chan<- *kafka.Reco
 	for {
 		select {
 		case <-ctx.Done():
-			c.logger.Info("Consumer context cancelled, stopping poll...")
+			c.logger.InfoContext(ctx, "Consumer context cancelled, stopping poll...")
 			return
 		case <-c.stopCh:
 			c.logger.Info("Consumer stop signal received, stopping poll...")
@@ -150,7 +150,7 @@ func (c *BookingConsumer) poll(ctx context.Context, recordsCh chan<- *kafka.Reco
 				if ctx.Err() != nil {
 					return
 				}
-				c.logger.Error(fmt.Sprintf("Failed to poll records: %v", err))
+				c.logger.ErrorContext(ctx, fmt.Sprintf("Failed to poll records: %v", err))
 				time.Sleep(time.Second)
 				continue
 			}
@@ -172,15 +172,15 @@ func (c *BookingConsumer) poll(ctx context.Context, recordsCh chan<- *kafka.Reco
 func (c *BookingConsumer) worker(ctx context.Context, id int, recordsCh <-chan *kafka.Record) {
 	defer c.wg.Done()
 
-	c.logger.Info(fmt.Sprintf("Worker %d started", id))
+	c.logger.InfoContext(ctx, fmt.Sprintf("Worker %d started", id))
 
 	for record := range recordsCh {
 		if err := c.processRecord(ctx, record); err != nil {
-			c.logger.Error(fmt.Sprintf("Worker %d failed to process record: %v", id, err))
+			c.logger.ErrorContext(ctx, fmt.Sprintf("Worker %d failed to process record: %v", id, err))
 		}
 	}
 
-	c.logger.Info(fmt.Sprintf("Worker %d stopped", id))
+	c.logger.InfoContext(ctx, fmt.Sprintf("Worker %d stopped", id))
 }
 
 // processRecord processes a single Kafka record
@@ -188,23 +188,23 @@ func (c *BookingConsumer) processRecord(ctx context.Context, record *kafka.Recor
 	// Parse booking event
 	var event BookingEvent
 	if err := json.Unmarshal(record.Value, &event); err != nil {
-		c.logger.Error(fmt.Sprintf("Failed to unmarshal booking event: %v", err))
+		c.logger.ErrorContext(ctx, fmt.Sprintf("Failed to unmarshal booking event: %v", err))
 		// Commit the record anyway to avoid reprocessing invalid messages
 		return c.consumer.CommitRecords(ctx, []*kafka.Record{record})
 	}
 
-	c.logger.Info(fmt.Sprintf("Received booking event: type=%s, booking_id=%s",
+	c.logger.InfoContext(ctx, fmt.Sprintf("Received booking event: type=%s, booking_id=%s",
 		event.EventType, event.BookingData.BookingID))
 
 	// Only process booking.created events
 	if event.EventType != BookingEventCreated {
-		c.logger.Info(fmt.Sprintf("Skipping event type: %s", event.EventType))
+		c.logger.InfoContext(ctx, fmt.Sprintf("Skipping event type: %s", event.EventType))
 		return c.consumer.CommitRecords(ctx, []*kafka.Record{record})
 	}
 
 	// Process the booking event
 	if err := c.handleBookingCreated(ctx, &event); err != nil {
-		c.logger.Error(fmt.Sprintf("Failed to handle booking.created event: %v", err))
+		c.logger.ErrorContext(ctx, fmt.Sprintf("Failed to handle booking.created event: %v", err))
 		// Don't commit on error - let it be reprocessed
 		return err
 	}
@@ -220,7 +220,7 @@ func (c *BookingConsumer) handleBookingCreated(ctx context.Context, event *Booki
 		return fmt.Errorf("booking data is nil")
 	}
 
-	c.logger.Info(fmt.Sprintf("Processing booking.created: booking_id=%s, user_id=%s, amount=%.2f %s",
+	c.logger.InfoContext(ctx, fmt.Sprintf("Processing booking.created: booking_id=%s, user_id=%s, amount=%.2f %s",
 		data.BookingID, data.UserID, data.TotalPrice, data.Currency))
 
 	// Create payment request
@@ -241,7 +241,7 @@ func (c *BookingConsumer) handleBookingCreated(ctx context.Context, event *Booki
 	// Create and process payment
 	payment, err := c.paymentService.CreatePayment(ctx, paymentReq)
 	if err != nil {
-		c.logger.Error(fmt.Sprintf("Failed to create payment: %v", err))
+		c.logger.ErrorContext(ctx, fmt.Sprintf("Failed to create payment: %v", err))
 		// Publish payment.failed event
 		return c.publishPaymentEvent(ctx, PaymentEventFailed, nil, data.BookingID, data.UserID, err.Error())
 	}
@@ -249,18 +249,18 @@ func (c *BookingConsumer) handleBookingCreated(ctx context.Context, event *Booki
 	// Process the payment
 	processedPayment, err := c.paymentService.ProcessPayment(ctx, payment.ID)
 	if err != nil {
-		c.logger.Error(fmt.Sprintf("Failed to process payment: %v", err))
+		c.logger.ErrorContext(ctx, fmt.Sprintf("Failed to process payment: %v", err))
 		// Publish payment.failed event
 		return c.publishPaymentEvent(ctx, PaymentEventFailed, payment, data.BookingID, data.UserID, err.Error())
 	}
 
 	// Publish payment result event
 	if processedPayment.Status == domain.PaymentStatusSucceeded {
-		c.logger.Info(fmt.Sprintf("Payment successful: payment_id=%s, gateway_payment_id=%s",
+		c.logger.InfoContext(ctx, fmt.Sprintf("Payment successful: payment_id=%s, gateway_payment_id=%s",
 			processedPayment.ID, processedPayment.GatewayPaymentID))
 		return c.publishPaymentEvent(ctx, PaymentEventSuccess, processedPayment, data.BookingID, data.UserID, "")
 	} else {
-		c.logger.Info(fmt.Sprintf("Payment failed: payment_id=%s, reason=%s",
+		c.logger.InfoContext(ctx, fmt.Sprintf("Payment failed: payment_id=%s, reason=%s",
 			processedPayment.ID, processedPayment.ErrorMessage))
 		return c.publishPaymentEvent(ctx, PaymentEventFailed, processedPayment, data.BookingID, data.UserID, processedPayment.ErrorMessage)
 	}
@@ -307,11 +307,11 @@ func (c *BookingConsumer) publishPaymentEvent(
 	}
 
 	if err := c.producer.ProduceJSON(ctx, c.config.PaymentTopic, event.Key(), event, headers); err != nil {
-		c.logger.Error(fmt.Sprintf("Failed to publish payment event: %v", err))
+		c.logger.ErrorContext(ctx, fmt.Sprintf("Failed to publish payment event: %v", err))
 		return err
 	}
 
-	c.logger.Info(fmt.Sprintf("Published payment event: type=%s, booking_id=%s", eventType, bookingID))
+	c.logger.InfoContext(ctx, fmt.Sprintf("Published payment event: type=%s, booking_id=%s", eventType, bookingID))
 	return nil
 }
 

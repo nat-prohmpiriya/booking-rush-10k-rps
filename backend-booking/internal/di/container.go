@@ -39,18 +39,19 @@ type Container struct {
 
 // ContainerConfig contains configuration for building the container
 type ContainerConfig struct {
-	DB                 *database.PostgresDB
-	Redis              *redis.Client
-	BookingRepo        repository.BookingRepository
-	ReservationRepo    repository.ReservationRepository
-	QueueRepo          repository.QueueRepository
-	EventPublisher     service.EventPublisher
-	ServiceConfig      *service.BookingServiceConfig
-	QueueServiceConfig *service.QueueServiceConfig
-	TicketServiceURL   string // URL of ticket service for zone sync
-	SagaProducer       saga.SagaProducer
-	SagaStore          pkgsaga.Store
-	SagaServiceConfig  *service.SagaServiceConfig
+	DB                   *database.PostgresDB
+	Redis                *redis.Client
+	BookingRepo          repository.BookingRepository
+	ReservationRepo      repository.ReservationRepository
+	QueueRepo            repository.QueueRepository
+	EventPublisher       service.EventPublisher
+	ServiceConfig        *service.BookingServiceConfig
+	QueueServiceConfig   *service.QueueServiceConfig
+	TicketServiceURL     string // URL of ticket service for zone sync
+	SagaProducer         saga.SagaProducer
+	SagaStore            pkgsaga.Store
+	SagaServiceConfig    *service.SagaServiceConfig
+	BookingHandlerConfig *handler.BookingHandlerConfig
 	// Note: Saga is now triggered asynchronously after payment success via webhook
 	// Booking handler always uses fast path (Redis Lua + PostgreSQL)
 }
@@ -99,7 +100,7 @@ func NewContainer(cfg *ContainerConfig) *Container {
 
 	// Booking handler uses fast path (Redis Lua + PostgreSQL)
 	// Saga is triggered asynchronously after payment success via webhook
-	c.BookingHandler = handler.NewBookingHandler(c.BookingService)
+	c.BookingHandler = handler.NewBookingHandler(c.BookingService, c.QueueService, cfg.BookingHandlerConfig)
 
 	c.QueueHandler = handler.NewQueueHandler(c.QueueService)
 	c.AdminHandler = handler.NewAdminHandler(c.Redis)

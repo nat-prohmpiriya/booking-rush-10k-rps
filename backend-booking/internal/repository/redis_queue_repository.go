@@ -8,6 +8,9 @@ import (
 
 	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking/internal/domain"
 	pkgredis "github.com/prohmpiriya/booking-rush-10k-rps/pkg/redis"
+	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/telemetry"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 )
 
 //go:embed scripts/join_queue.lua
@@ -43,6 +46,14 @@ func (r *RedisQueueRepository) LoadScripts(ctx context.Context) error {
 
 // JoinQueue adds a user to the queue using Sorted Set
 func (r *RedisQueueRepository) JoinQueue(ctx context.Context, params JoinQueueParams) (*JoinQueueResult, error) {
+	ctx, span := telemetry.StartSpan(ctx, "repo.redis.queue.join")
+	defer span.End()
+
+	span.SetAttributes(
+		attribute.String("event_id", params.EventID),
+		attribute.String("user_id", params.UserID),
+	)
+
 	// Build Redis keys
 	queueKey := fmt.Sprintf("queue:%s", params.EventID)
 	userQueueKey := fmt.Sprintf("queue:user:%s:%s", params.EventID, params.UserID)
@@ -58,16 +69,21 @@ func (r *RedisQueueRepository) JoinQueue(ctx context.Context, params JoinQueuePa
 
 	result := r.client.EvalWithFallback(ctx, scriptJoinQueue, joinQueueScript, keys, args...)
 	if result.Err() != nil {
+		span.RecordError(result.Err())
+		span.SetStatus(codes.Error, result.Err().Error())
 		return nil, fmt.Errorf("failed to execute join_queue script: %w", result.Err())
 	}
 
 	// Parse result
 	values, err := result.Slice()
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, fmt.Errorf("failed to parse script result: %w", err)
 	}
 
 	if len(values) < 3 {
+		span.SetStatus(codes.Error, "unexpected result length")
 		return nil, fmt.Errorf("unexpected script result length: %d", len(values))
 	}
 
@@ -76,6 +92,11 @@ func (r *RedisQueueRepository) JoinQueue(ctx context.Context, params JoinQueuePa
 		position, _ := toInt64(values[1])
 		totalInQueue, _ := toInt64(values[2])
 		joinedAt, _ := toFloat64(values[3])
+		span.SetAttributes(
+			attribute.Int64("position", position),
+			attribute.Int64("total_in_queue", totalInQueue),
+		)
+		span.SetStatus(codes.Ok, "")
 		return &JoinQueueResult{
 			Success:      true,
 			Position:     position,
@@ -87,6 +108,8 @@ func (r *RedisQueueRepository) JoinQueue(ctx context.Context, params JoinQueuePa
 	// Error case
 	errorCode, _ := values[1].(string)
 	errorMessage, _ := values[2].(string)
+	span.SetAttributes(attribute.String("error_code", errorCode))
+	span.SetStatus(codes.Error, errorCode)
 	return &JoinQueueResult{
 		Success:      false,
 		ErrorCode:    errorCode,
@@ -96,6 +119,14 @@ func (r *RedisQueueRepository) JoinQueue(ctx context.Context, params JoinQueuePa
 
 // GetPosition gets the user's current position in queue
 func (r *RedisQueueRepository) GetPosition(ctx context.Context, eventID, userID string) (*QueuePositionResult, error) {
+	ctx, span := telemetry.StartSpan(ctx, "repo.redis.queue.get_position")
+	defer span.End()
+
+	span.SetAttributes(
+		attribute.String("event_id", eventID),
+		attribute.String("user_id", userID),
+	)
+
 	queueKey := fmt.Sprintf("queue:%s", eventID)
 
 	// Get user's rank in sorted set (0-indexed)
@@ -103,21 +134,31 @@ func (r *RedisQueueRepository) GetPosition(ctx context.Context, eventID, userID 
 	if err != nil {
 		// User not in queue
 		if err.Error() == "redis: nil" {
+			span.SetStatus(codes.Ok, "not in queue")
 			return &QueuePositionResult{
 				Position:     0,
 				TotalInQueue: 0,
 				IsInQueue:    false,
 			}, nil
 		}
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, fmt.Errorf("failed to get queue position: %w", err)
 	}
 
 	// Get total count
 	total, err := r.client.ZCard(ctx, queueKey).Result()
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, fmt.Errorf("failed to get queue size: %w", err)
 	}
 
+	span.SetAttributes(
+		attribute.Int64("position", rank+1),
+		attribute.Int64("total_in_queue", total),
+	)
+	span.SetStatus(codes.Ok, "")
 	return &QueuePositionResult{
 		Position:     rank + 1, // Convert to 1-indexed
 		TotalInQueue: total,
@@ -127,17 +168,29 @@ func (r *RedisQueueRepository) GetPosition(ctx context.Context, eventID, userID 
 
 // LeaveQueue removes a user from the queue
 func (r *RedisQueueRepository) LeaveQueue(ctx context.Context, eventID, userID, token string) error {
+	ctx, span := telemetry.StartSpan(ctx, "repo.redis.queue.leave")
+	defer span.End()
+
+	span.SetAttributes(
+		attribute.String("event_id", eventID),
+		attribute.String("user_id", userID),
+	)
+
 	// First verify the token
 	userQueueKey := fmt.Sprintf("queue:user:%s:%s", eventID, userID)
 	storedToken, err := r.client.HGet(ctx, userQueueKey, "token").Result()
 	if err != nil {
 		if err.Error() == "redis: nil" {
+			span.SetStatus(codes.Error, "not in queue")
 			return domain.ErrNotInQueue
 		}
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return fmt.Errorf("failed to get user queue info: %w", err)
 	}
 
 	if storedToken != token {
+		span.SetStatus(codes.Error, "invalid token")
 		return domain.ErrInvalidQueueToken
 	}
 
@@ -145,26 +198,40 @@ func (r *RedisQueueRepository) LeaveQueue(ctx context.Context, eventID, userID, 
 	queueKey := fmt.Sprintf("queue:%s", eventID)
 	removed, err := r.client.ZRem(ctx, queueKey, userID).Result()
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return fmt.Errorf("failed to remove from queue: %w", err)
 	}
 
 	if removed == 0 {
+		span.SetStatus(codes.Error, "not in queue")
 		return domain.ErrNotInQueue
 	}
 
 	// Remove user queue info
 	r.client.Del(ctx, userQueueKey)
 
+	span.SetStatus(codes.Ok, "")
 	return nil
 }
 
 // GetQueueSize gets the total number of users in queue for an event
 func (r *RedisQueueRepository) GetQueueSize(ctx context.Context, eventID string) (int64, error) {
+	ctx, span := telemetry.StartSpan(ctx, "repo.redis.queue.get_size")
+	defer span.End()
+
+	span.SetAttributes(attribute.String("event_id", eventID))
+
 	queueKey := fmt.Sprintf("queue:%s", eventID)
 	count, err := r.client.ZCard(ctx, queueKey).Result()
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return 0, fmt.Errorf("failed to get queue size: %w", err)
 	}
+
+	span.SetAttributes(attribute.Int64("count", count))
+	span.SetStatus(codes.Ok, "")
 	return count, nil
 }
 
@@ -197,6 +264,19 @@ func toFloat64(v interface{}) (float64, bool) {
 	default:
 		return 0, false
 	}
+}
+
+// GetQueuePass retrieves the queue pass for a user (if exists)
+func (r *RedisQueueRepository) GetQueuePass(ctx context.Context, eventID, userID string) (string, error) {
+	key := fmt.Sprintf("queue:pass:%s:%s", eventID, userID)
+	queuePass, err := r.client.Get(ctx, key).Result()
+	if err != nil {
+		if err.Error() == "redis: nil" {
+			return "", nil // No queue pass found
+		}
+		return "", fmt.Errorf("failed to get queue pass: %w", err)
+	}
+	return queuePass, nil
 }
 
 // StoreQueuePass stores the queue pass token in Redis with TTL

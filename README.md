@@ -464,3 +464,12 @@ Detailed explanations of key architectural decisions:
 ## License
 
 MIT
+
+
+Architected a microservices system designed for 10,000 RPS with horizontal scaling, achieving 1,000+ RPS per node
+Engineered zero-overselling guarantee using Redis Lua scripts
+for atomic seat reservations (verified under 10K concurrent load)
+Implemented Virtual Queue system successfully managing
+10,000 concurrent users with 100% queue pass delivery
+Tech Stack: Go/Gin, Redis, Kafka(Redpanda), PostgreSQL,
+OpenTelemetry, Grafana Stack, Docker, K3s, ArgoCD

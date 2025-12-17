@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking/internal/domain"
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/kafka"
+	"go.uber.org/zap"
 )
 
 // EventPublisher defines the interface for publishing booking events
@@ -34,6 +35,13 @@ type KafkaEventPublisher struct {
 	producer    *kafka.Producer
 	topic       string
 	serviceName string
+	logger      Logger
+}
+
+// Logger interface for event publisher
+type Logger interface {
+	Error(msg string)
+	Warn(msg string)
 }
 
 // EventPublisherConfig contains configuration for the event publisher
@@ -42,6 +50,7 @@ type EventPublisherConfig struct {
 	Topic       string
 	ServiceName string
 	ClientID    string
+	Logger      Logger
 }
 
 // NewKafkaEventPublisher creates a new Kafka event publisher
@@ -85,6 +94,7 @@ func NewKafkaEventPublisher(ctx context.Context, cfg *EventPublisherConfig) (*Ka
 		producer:    producer,
 		topic:       topic,
 		serviceName: serviceName,
+		logger:      cfg.Logger,
 	}, nil
 }
 
@@ -116,7 +126,7 @@ func (p *KafkaEventPublisher) Close() error {
 	return nil
 }
 
-// publishEvent publishes a booking event to Kafka
+// publishEvent publishes a booking event to Kafka asynchronously (fire-and-forget with logging)
 func (p *KafkaEventPublisher) publishEvent(ctx context.Context, eventType domain.BookingEventType, booking *domain.Booking) error {
 	eventID := uuid.New().String()
 	event := domain.NewBookingEvent(eventType, booking, eventID)
@@ -141,11 +151,46 @@ func (p *KafkaEventPublisher) publishEvent(ctx context.Context, eventType domain
 		Timestamp: time.Now(),
 	}
 
-	if err := p.producer.Produce(ctx, msg); err != nil {
-		return fmt.Errorf("failed to publish %s event: %w", eventType, err)
-	}
+	// Use ProduceAsync with background context to avoid blocking the booking request
+	// and prevent "context canceled" errors when HTTP request completes before publish
+	// Error handling via callback - log but don't fail the request
+	p.producer.ProduceAsync(context.Background(), msg, func(err error) {
+		if err != nil && p.logger != nil {
+			p.logger.Error(fmt.Sprintf("failed to publish %s event for booking %s: %v", eventType, booking.ID, err))
+		}
+	})
 
 	return nil
+}
+
+// ZapLogger is the interface that pkg/logger.Logger implements
+type ZapLogger interface {
+	Error(msg string, fields ...zap.Field)
+	Warn(msg string, fields ...zap.Field)
+}
+
+// ZapLoggerAdapter adapts zap logger to Logger interface
+type ZapLoggerAdapter struct {
+	logger ZapLogger
+}
+
+// NewZapLoggerAdapter creates a new ZapLoggerAdapter
+func NewZapLoggerAdapter(l ZapLogger) *ZapLoggerAdapter {
+	return &ZapLoggerAdapter{logger: l}
+}
+
+// Error logs an error message
+func (a *ZapLoggerAdapter) Error(msg string) {
+	if a.logger != nil {
+		a.logger.Error(msg)
+	}
+}
+
+// Warn logs a warning message
+func (a *ZapLoggerAdapter) Warn(msg string) {
+	if a.logger != nil {
+		a.logger.Warn(msg)
+	}
 }
 
 // NoOpEventPublisher is a no-op implementation of EventPublisher for testing

@@ -126,6 +126,9 @@ Thumbs.db
 # k6 test results
 tests/load/results/
 
+# Generated tokens (expire quickly, regenerate before test)
+tests/load/seed-data/tokens.json
+
 # Generated documentation
 docs/api/generated/
 

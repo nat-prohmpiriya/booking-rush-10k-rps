@@ -11,6 +11,9 @@ import (
 	"github.com/prohmpiriya/booking-rush-10k-rps/backend-ticket/internal/service"
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/middleware"
 	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/response"
+	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/telemetry"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 )
 
 // EventHandler handles event-related HTTP requests
@@ -29,6 +32,10 @@ func NewEventHandler(eventService service.EventService, showService service.Show
 
 // List handles GET /events - lists published events for public
 func (h *EventHandler) List(c *gin.Context) {
+	ctx, span := telemetry.StartSpan(c.Request.Context(), "handler.event.list")
+	defer span.End()
+	c.Request = c.Request.WithContext(ctx)
+
 	// Parse pagination params
 	limit := 20
 	offset := 0
@@ -43,8 +50,15 @@ func (h *EventHandler) List(c *gin.Context) {
 		}
 	}
 
-	events, total, err := h.eventService.ListPublishedEvents(c.Request.Context(), limit, offset)
+	span.SetAttributes(
+		attribute.Int("limit", limit),
+		attribute.Int("offset", offset),
+	)
+
+	events, total, err := h.eventService.ListPublishedEvents(ctx, limit, offset)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		c.JSON(http.StatusInternalServerError, response.InternalError("Failed to list events"))
 		return
 	}
@@ -52,64 +66,90 @@ func (h *EventHandler) List(c *gin.Context) {
 	eventResponses := make([]*dto.EventResponse, len(events))
 	for i, event := range events {
 		// Fetch shows for this event to calculate sale status
-		shows, _, _ := h.showService.ListShowsByEvent(c.Request.Context(), event.ID, nil)
+		shows, _, _ := h.showService.ListShowsByEvent(ctx, event.ID, nil)
 		saleStatus := calculateSaleStatus(shows)
 		eventResponses[i] = toEventResponse(event, saleStatus)
 	}
 
+	span.SetAttributes(attribute.Int("total", total))
+	span.SetStatus(codes.Ok, "")
 	c.JSON(http.StatusOK, response.Paginated(eventResponses, offset/limit+1, limit, int64(total)))
 }
 
 // GetBySlug handles GET /events/slug/:slug - retrieves an event by slug
 // For non-published events, only the owner can view
 func (h *EventHandler) GetBySlug(c *gin.Context) {
+	ctx, span := telemetry.StartSpan(c.Request.Context(), "handler.event.get_by_slug")
+	defer span.End()
+	c.Request = c.Request.WithContext(ctx)
+
 	slug := c.Param("slug")
 	if slug == "" {
+		span.SetStatus(codes.Error, "slug required")
 		c.JSON(http.StatusBadRequest, response.BadRequest("Slug is required"))
 		return
 	}
 
-	event, err := h.eventService.GetEventBySlug(c.Request.Context(), slug)
+	span.SetAttributes(attribute.String("event_slug", slug))
+
+	event, err := h.eventService.GetEventBySlug(ctx, slug)
 	if err != nil {
+		span.RecordError(err)
 		if errors.Is(err, service.ErrEventNotFound) {
+			span.SetStatus(codes.Error, "event not found")
 			c.JSON(http.StatusNotFound, response.NotFound("Event not found"))
 			return
 		}
+		span.SetStatus(codes.Error, err.Error())
 		c.JSON(http.StatusInternalServerError, response.InternalError("Failed to get event"))
 		return
 	}
+
+	span.SetAttributes(attribute.String("event_id", event.ID))
 
 	// If event is not published, only owner can view
 	if event.Status != domain.EventStatusPublished {
 		userID, _ := middleware.GetUserID(c)
 		if userID != event.OrganizerID {
+			span.SetStatus(codes.Error, "unauthorized")
 			c.JSON(http.StatusNotFound, response.NotFound("Event not found"))
 			return
 		}
 	}
 
 	// Fetch shows for this event to calculate sale status
-	shows, _, _ := h.showService.ListShowsByEvent(c.Request.Context(), event.ID, nil)
+	shows, _, _ := h.showService.ListShowsByEvent(ctx, event.ID, nil)
 	saleStatus := calculateSaleStatus(shows)
 
+	span.SetStatus(codes.Ok, "")
 	c.JSON(http.StatusOK, response.Success(toEventResponse(event, saleStatus)))
 }
 
 // GetByID handles GET /events/:id - retrieves an event by ID (UUID)
 // For non-published events, only the owner can view
 func (h *EventHandler) GetByID(c *gin.Context) {
+	ctx, span := telemetry.StartSpan(c.Request.Context(), "handler.event.get_by_id")
+	defer span.End()
+	c.Request = c.Request.WithContext(ctx)
+
 	id := c.Param("id")
 	if id == "" {
+		span.SetStatus(codes.Error, "id required")
 		c.JSON(http.StatusBadRequest, response.BadRequest("ID is required"))
 		return
 	}
 
-	event, err := h.eventService.GetEventByID(c.Request.Context(), id)
+	span.SetAttributes(attribute.String("event_id", id))
+
+	event, err := h.eventService.GetEventByID(ctx, id)
 	if err != nil {
+		span.RecordError(err)
 		if errors.Is(err, service.ErrEventNotFound) {
+			span.SetStatus(codes.Error, "event not found")
 			c.JSON(http.StatusNotFound, response.NotFound("Event not found"))
 			return
 		}
+		span.SetStatus(codes.Error, err.Error())
 		c.JSON(http.StatusInternalServerError, response.InternalError("Failed to get event"))
 		return
 	}
@@ -118,26 +158,35 @@ func (h *EventHandler) GetByID(c *gin.Context) {
 	if event.Status != domain.EventStatusPublished {
 		userID, _ := middleware.GetUserID(c)
 		if userID != event.OrganizerID {
+			span.SetStatus(codes.Error, "unauthorized")
 			c.JSON(http.StatusNotFound, response.NotFound("Event not found"))
 			return
 		}
 	}
 
 	// Fetch shows for this event to calculate sale status
-	shows, _, _ := h.showService.ListShowsByEvent(c.Request.Context(), event.ID, nil)
+	shows, _, _ := h.showService.ListShowsByEvent(ctx, event.ID, nil)
 	saleStatus := calculateSaleStatus(shows)
 
+	span.SetStatus(codes.Ok, "")
 	c.JSON(http.StatusOK, response.Success(toEventResponse(event, saleStatus)))
 }
 
 // ListMyEvents handles GET /events/my - lists events owned by current user (Organizer)
 func (h *EventHandler) ListMyEvents(c *gin.Context) {
+	ctx, span := telemetry.StartSpan(c.Request.Context(), "handler.event.list_my_events")
+	defer span.End()
+	c.Request = c.Request.WithContext(ctx)
+
 	// Get user ID from JWT context
 	userID, ok := middleware.GetUserID(c)
 	if !ok || userID == "" {
+		span.SetStatus(codes.Error, "user ID not found in token")
 		c.JSON(http.StatusUnauthorized, response.Unauthorized("User ID not found in token"))
 		return
 	}
+
+	span.SetAttributes(attribute.String("organizer_id", userID))
 
 	// Parse pagination params
 	limit := 20
@@ -161,8 +210,17 @@ func (h *EventHandler) ListMyEvents(c *gin.Context) {
 		Offset:      offset,
 	}
 
-	events, total, err := h.eventService.ListEvents(c.Request.Context(), filter)
+	span.SetAttributes(
+		attribute.Int("limit", limit),
+		attribute.Int("offset", offset),
+		attribute.String("status_filter", filter.Status),
+		attribute.String("search", filter.Search),
+	)
+
+	events, total, err := h.eventService.ListEvents(ctx, filter)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		c.JSON(http.StatusInternalServerError, response.InternalError("Failed to list events"))
 		return
 	}
@@ -170,18 +228,26 @@ func (h *EventHandler) ListMyEvents(c *gin.Context) {
 	eventResponses := make([]*dto.EventResponse, len(events))
 	for i, event := range events {
 		// Fetch shows for this event to calculate sale status
-		shows, _, _ := h.showService.ListShowsByEvent(c.Request.Context(), event.ID, nil)
+		shows, _, _ := h.showService.ListShowsByEvent(ctx, event.ID, nil)
 		saleStatus := calculateSaleStatus(shows)
 		eventResponses[i] = toEventResponse(event, saleStatus)
 	}
 
+	span.SetAttributes(attribute.Int("total", total))
+	span.SetStatus(codes.Ok, "")
 	c.JSON(http.StatusOK, response.Paginated(eventResponses, offset/limit+1, limit, int64(total)))
 }
 
 // Create handles POST /events - creates a new event (Organizer only)
 func (h *EventHandler) Create(c *gin.Context) {
+	ctx, span := telemetry.StartSpan(c.Request.Context(), "handler.event.create")
+	defer span.End()
+	c.Request = c.Request.WithContext(ctx)
+
 	var req dto.CreateEventRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "invalid request body")
 		c.JSON(http.StatusBadRequest, response.BadRequest("Invalid request body"))
 		return
 	}
@@ -189,6 +255,7 @@ func (h *EventHandler) Create(c *gin.Context) {
 	// Get tenant ID and user ID from JWT context
 	tenantID, ok := middleware.GetTenantID(c)
 	if !ok || tenantID == "" {
+		span.SetStatus(codes.Error, "tenant ID not found in token")
 		c.JSON(http.StatusUnauthorized, response.Unauthorized("Tenant ID not found in token"))
 		return
 	}
@@ -196,115 +263,165 @@ func (h *EventHandler) Create(c *gin.Context) {
 
 	userID, ok := middleware.GetUserID(c)
 	if !ok || userID == "" {
+		span.SetStatus(codes.Error, "user ID not found in token")
 		c.JSON(http.StatusUnauthorized, response.Unauthorized("User ID not found in token"))
 		return
 	}
 	req.OrganizerID = userID
 
+	span.SetAttributes(
+		attribute.String("tenant_id", tenantID),
+		attribute.String("organizer_id", userID),
+		attribute.String("event_name", req.Name),
+	)
+
 	// Validate request
 	if valid, msg := req.Validate(); !valid {
+		span.SetStatus(codes.Error, "validation failed")
 		c.JSON(http.StatusBadRequest, response.BadRequest(msg))
 		return
 	}
 
-	event, err := h.eventService.CreateEvent(c.Request.Context(), &req)
+	event, err := h.eventService.CreateEvent(ctx, &req)
 	if err != nil {
+		span.RecordError(err)
 		if errors.Is(err, service.ErrEventAlreadyExists) {
+			span.SetStatus(codes.Error, "event already exists")
 			c.JSON(http.StatusConflict, response.Error(response.ErrCodeConflict, "Event with this slug already exists"))
 			return
 		}
+		span.SetStatus(codes.Error, err.Error())
 		c.JSON(http.StatusInternalServerError, response.InternalError("Failed to create event"))
 		return
 	}
 
+	span.SetAttributes(attribute.String("event_id", event.ID))
+	span.SetStatus(codes.Ok, "")
 	// New event has no shows yet, default to "scheduled"
 	c.JSON(http.StatusCreated, response.Success(toEventResponse(event, "scheduled")))
 }
 
 // Update handles PUT /events/:id - updates an event
 func (h *EventHandler) Update(c *gin.Context) {
+	ctx, span := telemetry.StartSpan(c.Request.Context(), "handler.event.update")
+	defer span.End()
+	c.Request = c.Request.WithContext(ctx)
+
 	id := c.Param("id")
 	if id == "" {
+		span.SetStatus(codes.Error, "id required")
 		c.JSON(http.StatusBadRequest, response.BadRequest("ID is required"))
 		return
 	}
 
+	span.SetAttributes(attribute.String("event_id", id))
+
 	var req dto.UpdateEventRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "invalid request body")
 		c.JSON(http.StatusBadRequest, response.BadRequest("Invalid request body"))
 		return
 	}
 
 	// Validate request
 	if valid, msg := req.Validate(); !valid {
+		span.SetStatus(codes.Error, "validation failed")
 		c.JSON(http.StatusBadRequest, response.BadRequest(msg))
 		return
 	}
 
-	event, err := h.eventService.UpdateEvent(c.Request.Context(), id, &req)
+	event, err := h.eventService.UpdateEvent(ctx, id, &req)
 	if err != nil {
+		span.RecordError(err)
 		if errors.Is(err, service.ErrEventNotFound) {
+			span.SetStatus(codes.Error, "event not found")
 			c.JSON(http.StatusNotFound, response.NotFound("Event not found"))
 			return
 		}
+		span.SetStatus(codes.Error, err.Error())
 		c.JSON(http.StatusInternalServerError, response.InternalError("Failed to update event"))
 		return
 	}
 
 	// Fetch shows for this event to calculate sale status
-	shows, _, _ := h.showService.ListShowsByEvent(c.Request.Context(), event.ID, nil)
+	shows, _, _ := h.showService.ListShowsByEvent(ctx, event.ID, nil)
 	saleStatus := calculateSaleStatus(shows)
 
+	span.SetStatus(codes.Ok, "")
 	c.JSON(http.StatusOK, response.Success(toEventResponse(event, saleStatus)))
 }
 
 // Delete handles DELETE /events/:id - soft deletes an event
 func (h *EventHandler) Delete(c *gin.Context) {
+	ctx, span := telemetry.StartSpan(c.Request.Context(), "handler.event.delete")
+	defer span.End()
+	c.Request = c.Request.WithContext(ctx)
+
 	id := c.Param("id")
 	if id == "" {
+		span.SetStatus(codes.Error, "id required")
 		c.JSON(http.StatusBadRequest, response.BadRequest("ID is required"))
 		return
 	}
 
-	err := h.eventService.DeleteEvent(c.Request.Context(), id)
+	span.SetAttributes(attribute.String("event_id", id))
+
+	err := h.eventService.DeleteEvent(ctx, id)
 	if err != nil {
+		span.RecordError(err)
 		if errors.Is(err, service.ErrEventNotFound) {
+			span.SetStatus(codes.Error, "event not found")
 			c.JSON(http.StatusNotFound, response.NotFound("Event not found"))
 			return
 		}
+		span.SetStatus(codes.Error, err.Error())
 		c.JSON(http.StatusInternalServerError, response.InternalError("Failed to delete event"))
 		return
 	}
 
+	span.SetStatus(codes.Ok, "")
 	c.JSON(http.StatusOK, response.Success(map[string]string{"message": "Event deleted successfully"}))
 }
 
 // Publish handles POST /events/:id/publish - publishes an event
 func (h *EventHandler) Publish(c *gin.Context) {
+	ctx, span := telemetry.StartSpan(c.Request.Context(), "handler.event.publish")
+	defer span.End()
+	c.Request = c.Request.WithContext(ctx)
+
 	id := c.Param("id")
 	if id == "" {
+		span.SetStatus(codes.Error, "id required")
 		c.JSON(http.StatusBadRequest, response.BadRequest("ID is required"))
 		return
 	}
 
-	event, err := h.eventService.PublishEvent(c.Request.Context(), id)
+	span.SetAttributes(attribute.String("event_id", id))
+
+	event, err := h.eventService.PublishEvent(ctx, id)
 	if err != nil {
+		span.RecordError(err)
 		if errors.Is(err, service.ErrEventNotFound) {
+			span.SetStatus(codes.Error, "event not found")
 			c.JSON(http.StatusNotFound, response.NotFound("Event not found"))
 			return
 		}
 		if errors.Is(err, service.ErrInvalidEventStatus) {
+			span.SetStatus(codes.Error, "invalid event status")
 			c.JSON(http.StatusBadRequest, response.BadRequest("Only draft events can be published"))
 			return
 		}
+		span.SetStatus(codes.Error, err.Error())
 		c.JSON(http.StatusInternalServerError, response.InternalError("Failed to publish event"))
 		return
 	}
 
 	// Fetch shows for this event to calculate sale status
-	shows, _, _ := h.showService.ListShowsByEvent(c.Request.Context(), event.ID, nil)
+	shows, _, _ := h.showService.ListShowsByEvent(ctx, event.ID, nil)
 	saleStatus := calculateSaleStatus(shows)
 
+	span.SetStatus(codes.Ok, "")
 	c.JSON(http.StatusOK, response.Success(toEventResponse(event, saleStatus)))
 }
 

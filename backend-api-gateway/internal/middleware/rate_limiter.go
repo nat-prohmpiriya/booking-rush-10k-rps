@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -12,7 +13,20 @@ import (
 
 	"github.com/gin-gonic/gin"
 	pkgredis "github.com/prohmpiriya/booking-rush-10k-rps/pkg/redis"
+	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/telemetry"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 )
+
+// getEnvInt reads an integer from environment variable with a default value
+func getEnvInt(key string, defaultVal int) int {
+	if val := os.Getenv(key); val != "" {
+		if intVal, err := strconv.Atoi(val); err == nil {
+			return intVal
+		}
+	}
+	return defaultVal
+}
 
 // RateLimitConfig holds rate limiting configuration
 type RateLimitConfig struct {
@@ -275,8 +289,13 @@ func RateLimiter(config RateLimitConfig) gin.HandlerFunc {
 	}
 
 	return func(c *gin.Context) {
+		ctx, span := telemetry.StartSpan(c.Request.Context(), "middleware.rate_limiter")
+		defer span.End()
+		c.Request = c.Request.WithContext(ctx)
+
 		// Get client IP as rate limit key
 		clientIP := c.ClientIP()
+		span.SetAttributes(attribute.String("client_ip", clientIP))
 
 		var allowed bool
 		var remaining int
@@ -285,7 +304,7 @@ func RateLimiter(config RateLimitConfig) gin.HandlerFunc {
 		startTime := time.Now()
 
 		if redisLimiter != nil {
-			allowed, err = redisLimiter.Allow(c.Request.Context(), clientIP)
+			allowed, err = redisLimiter.Allow(ctx, clientIP)
 			if err != nil {
 				// Fallback to allowing on Redis errors (fail open)
 				allowed = true
@@ -293,6 +312,8 @@ func RateLimiter(config RateLimitConfig) gin.HandlerFunc {
 		} else {
 			allowed = localLimiter.Allow(clientIP)
 		}
+
+		span.SetAttributes(attribute.Bool("allowed", allowed))
 
 		// Calculate remaining tokens (approximation for headers)
 		remaining = config.BurstSize - 1
@@ -306,6 +327,8 @@ func RateLimiter(config RateLimitConfig) gin.HandlerFunc {
 		c.Header("X-RateLimit-Reset", strconv.FormatInt(time.Now().Add(time.Second).Unix(), 10))
 
 		if !allowed {
+			span.SetStatus(codes.Error, "rate limit exceeded")
+
 			// Calculate retry after (1 second default)
 			retryAfter := 1
 			c.Header("Retry-After", strconv.Itoa(retryAfter))
@@ -324,6 +347,7 @@ func RateLimiter(config RateLimitConfig) gin.HandlerFunc {
 			return
 		}
 
+		span.SetStatus(codes.Ok, "")
 		c.Next()
 	}
 }
@@ -409,38 +433,49 @@ func min(a, b float64) float64 {
 }
 
 // DefaultPerEndpointConfig returns sensible defaults for per-endpoint rate limiting
+// Reads from environment variables:
+// - RATE_LIMIT_REQUESTS_PER_MINUTE: default requests per minute (converted to per second)
+// - RATE_LIMIT_BURST: default burst size
+// - BOOKING_RATE_LIMIT_REQUESTS_PER_MINUTE: booking endpoint requests per minute
+// - BOOKING_RATE_LIMIT_BURST: booking endpoint burst size
 func DefaultPerEndpointConfig() PerEndpointRateLimitConfig {
+	// Read from ENV with defaults (convert per-minute to per-second)
+	defaultRPS := getEnvInt("RATE_LIMIT_REQUESTS_PER_MINUTE", 60000) / 60     // default 1000/s
+	defaultBurst := getEnvInt("RATE_LIMIT_BURST", 100)
+	bookingRPS := getEnvInt("BOOKING_RATE_LIMIT_REQUESTS_PER_MINUTE", 6000) / 60  // default 100/s
+	bookingBurst := getEnvInt("BOOKING_RATE_LIMIT_BURST", 20)
+
 	return PerEndpointRateLimitConfig{
 		Default: RateLimitConfig{
-			RequestsPerSecond: 1000,
-			BurstSize:         100,
+			RequestsPerSecond: defaultRPS,
+			BurstSize:         defaultBurst,
 		},
 		Endpoints: []EndpointRateLimitConfig{
-			// Critical booking endpoints - stricter limits
+			// Critical booking endpoints - configurable via ENV
 			{
 				PathPattern:       "/api/v1/bookings",
 				Methods:           []string{"POST"},
-				RequestsPerSecond: 100,
-				BurstSize:         20,
+				RequestsPerSecond: bookingRPS,
+				BurstSize:         bookingBurst,
 			},
 			{
 				PathPattern:       "/api/v1/bookings/*/confirm",
 				Methods:           []string{"POST"},
-				RequestsPerSecond: 50,
-				BurstSize:         10,
+				RequestsPerSecond: bookingRPS / 2, // half of booking rate
+				BurstSize:         bookingBurst / 2,
 			},
 			// Read-heavy endpoints - more generous limits
 			{
 				PathPattern:       "/api/v1/events",
 				Methods:           []string{"GET"},
-				RequestsPerSecond: 2000,
-				BurstSize:         200,
+				RequestsPerSecond: defaultRPS * 2,
+				BurstSize:         defaultBurst * 2,
 			},
 			{
 				PathPattern:       "/api/v1/events/*",
 				Methods:           []string{"GET"},
-				RequestsPerSecond: 2000,
-				BurstSize:         200,
+				RequestsPerSecond: defaultRPS * 2,
+				BurstSize:         defaultBurst * 2,
 			},
 			// Auth endpoints - moderate limits
 			{
@@ -556,23 +591,35 @@ func PerEndpointRateLimiter(config PerEndpointRateLimitConfig) gin.HandlerFunc {
 	}
 
 	return func(c *gin.Context) {
+		ctx, span := telemetry.StartSpan(c.Request.Context(), "middleware.per_endpoint_rate_limiter")
+		defer span.End()
+		c.Request = c.Request.WithContext(ctx)
+
 		path := c.FullPath() // Use registered path pattern instead of actual path
 		if path == "" {
 			path = c.Request.URL.Path
 		}
 		method := c.Request.Method
 
+		// Get client IP as rate limit key
+		clientIP := c.ClientIP()
+
 		// Get rate limit config for this endpoint
 		rps, burst := config.findEndpointConfig(method, path)
 
+		span.SetAttributes(
+			attribute.String("client_ip", clientIP),
+			attribute.String("path", path),
+			attribute.Int("rps", rps),
+			attribute.Int("burst", burst),
+		)
+
 		// Skip rate limiting if unlimited
 		if rps <= 0 {
+			span.SetStatus(codes.Ok, "")
 			c.Next()
 			return
 		}
-
-		// Get client IP as rate limit key
-		clientIP := c.ClientIP()
 
 		var allowed bool
 		var remainingTokens float64
@@ -581,7 +628,7 @@ func PerEndpointRateLimiter(config PerEndpointRateLimitConfig) gin.HandlerFunc {
 			// For Redis, include the rate config in the key for per-endpoint limits
 			redisKey := fmt.Sprintf("%s:%d:%d", clientIP, rps, burst)
 			var err error
-			allowed, remainingTokens, err = redisLimiter.AllowWithRemaining(c.Request.Context(), redisKey, rps, burst)
+			allowed, remainingTokens, err = redisLimiter.AllowWithRemaining(ctx, redisKey, rps, burst)
 			if err != nil {
 				// Fallback to allowing on Redis errors (fail open)
 				allowed = true
@@ -591,6 +638,8 @@ func PerEndpointRateLimiter(config PerEndpointRateLimitConfig) gin.HandlerFunc {
 			limiter := getLimiter(rps, burst)
 			allowed, remainingTokens = limiter.AllowWithRemaining(clientIP)
 		}
+
+		span.SetAttributes(attribute.Bool("allowed", allowed))
 
 		// Calculate remaining (at least 0)
 		remaining := int(remainingTokens)
@@ -605,6 +654,8 @@ func PerEndpointRateLimiter(config PerEndpointRateLimitConfig) gin.HandlerFunc {
 		c.Header("X-RateLimit-Burst", strconv.Itoa(burst))
 
 		if !allowed {
+			span.SetStatus(codes.Error, "rate limit exceeded")
+
 			// Calculate retry after based on how many tokens we need and refill rate
 			retryAfterSeconds := 1.0
 			if rps > 0 {
@@ -630,6 +681,7 @@ func PerEndpointRateLimiter(config PerEndpointRateLimitConfig) gin.HandlerFunc {
 			return
 		}
 
+		span.SetStatus(codes.Ok, "")
 		c.Next()
 	}
 }

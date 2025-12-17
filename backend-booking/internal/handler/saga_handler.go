@@ -7,6 +7,9 @@ import (
 	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking/internal/dto"
 	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking/internal/saga"
 	"github.com/prohmpiriya/booking-rush-10k-rps/backend-booking/internal/service"
+	"github.com/prohmpiriya/booking-rush-10k-rps/pkg/telemetry"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 )
 
 // SagaHandler handles saga-based booking HTTP requests
@@ -43,8 +46,13 @@ type SagaBookingResponse struct {
 // StartBookingSaga handles POST /saga/bookings
 // This initiates an async booking process via saga pattern
 func (h *SagaHandler) StartBookingSaga(c *gin.Context) {
+	ctx, span := telemetry.StartSpan(c.Request.Context(), "handler.saga.start")
+	defer span.End()
+	c.Request = c.Request.WithContext(ctx)
+
 	userID := c.GetString("user_id")
 	if userID == "" {
+		span.SetStatus(codes.Error, "unauthorized")
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse{
 			Error: "unauthorized",
 			Code:  "UNAUTHORIZED",
@@ -54,6 +62,8 @@ func (h *SagaHandler) StartBookingSaga(c *gin.Context) {
 
 	var req SagaBookingRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "invalid request")
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
 			Error:   "invalid request",
 			Code:    "INVALID_REQUEST",
@@ -70,6 +80,17 @@ func (h *SagaHandler) StartBookingSaga(c *gin.Context) {
 		req.PaymentMethod = "card"
 	}
 
+	span.SetAttributes(
+		attribute.String("user_id", userID),
+		attribute.String("event_id", req.EventID),
+		attribute.String("zone_id", req.ZoneID),
+		attribute.String("show_id", req.ShowID),
+		attribute.Int("quantity", req.Quantity),
+		attribute.Float64("total_price", req.TotalPrice),
+		attribute.String("currency", req.Currency),
+		attribute.String("payment_method", req.PaymentMethod),
+	)
+
 	// Create saga data
 	sagaData := &saga.BookingSagaData{
 		BookingID:     "", // Will be generated
@@ -84,8 +105,10 @@ func (h *SagaHandler) StartBookingSaga(c *gin.Context) {
 	}
 
 	// Start saga
-	sagaID, err := h.sagaService.StartBookingSaga(c.Request.Context(), sagaData)
+	sagaID, err := h.sagaService.StartBookingSaga(ctx, sagaData)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
 			Error:   "failed to start booking saga",
 			Code:    "SAGA_START_FAILED",
@@ -94,6 +117,8 @@ func (h *SagaHandler) StartBookingSaga(c *gin.Context) {
 		return
 	}
 
+	span.SetAttributes(attribute.String("saga_id", sagaID))
+	span.SetStatus(codes.Ok, "")
 	c.JSON(http.StatusAccepted, SagaBookingResponse{
 		SagaID:  sagaID,
 		Status:  "pending",
@@ -103,8 +128,13 @@ func (h *SagaHandler) StartBookingSaga(c *gin.Context) {
 
 // GetSagaStatus handles GET /saga/bookings/:saga_id
 func (h *SagaHandler) GetSagaStatus(c *gin.Context) {
+	ctx, span := telemetry.StartSpan(c.Request.Context(), "handler.saga.status")
+	defer span.End()
+	c.Request = c.Request.WithContext(ctx)
+
 	sagaID := c.Param("saga_id")
 	if sagaID == "" {
+		span.SetStatus(codes.Error, "saga_id required")
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
 			Error: "saga_id required",
 			Code:  "INVALID_REQUEST",
@@ -112,8 +142,12 @@ func (h *SagaHandler) GetSagaStatus(c *gin.Context) {
 		return
 	}
 
-	instance, err := h.sagaService.GetSagaStatus(c.Request.Context(), sagaID)
+	span.SetAttributes(attribute.String("saga_id", sagaID))
+
+	instance, err := h.sagaService.GetSagaStatus(ctx, sagaID)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		c.JSON(http.StatusNotFound, dto.ErrorResponse{
 			Error:   "saga not found",
 			Code:    "NOT_FOUND",
@@ -122,6 +156,11 @@ func (h *SagaHandler) GetSagaStatus(c *gin.Context) {
 		return
 	}
 
+	span.SetAttributes(
+		attribute.String("status", string(instance.Status)),
+		attribute.Int("current_step", instance.CurrentStep),
+	)
+	span.SetStatus(codes.Ok, "")
 	c.JSON(http.StatusOK, gin.H{
 		"saga_id":      instance.ID,
 		"status":       instance.Status,
