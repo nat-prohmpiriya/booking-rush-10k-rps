@@ -63,13 +63,14 @@ func NewReverseProxy(config ProxyConfig) *ReverseProxy {
 	}
 
 	// Create optimized HTTP transport for high performance
+	// MaxIdleConns/MaxIdleConnsPerHost set to 15000 to handle 10K+ SSE connections at scale
 	transport := &http.Transport{
 		DialContext: (&net.Dialer{
 			Timeout:   5 * time.Second,
 			KeepAlive: 30 * time.Second,
 		}).DialContext,
-		MaxIdleConns:          100,
-		MaxIdleConnsPerHost:   100,
+		MaxIdleConns:          15000,
+		MaxIdleConnsPerHost:   15000,
 		IdleConnTimeout:       90 * time.Second,
 		TLSHandshakeTimeout:   5 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
@@ -468,14 +469,14 @@ func ConfigFromEnv(authURL, ticketURL, bookingURL, paymentURL, jwtSecret string)
 				},
 				RequireAuth: true,
 			},
-			// Queue - all protected
+			// Queue - all protected (SSE needs 5 minutes timeout)
 			{
 				PathPrefix:  "/api/v1/queue",
 				StripPrefix: "",
 				Service: ServiceConfig{
 					Name:    "booking-service",
 					BaseURL: bookingURL,
-					Timeout: 30 * time.Second,
+					Timeout: 5 * time.Minute, // SSE streaming requires longer timeout
 				},
 				RequireAuth: true,
 			},
