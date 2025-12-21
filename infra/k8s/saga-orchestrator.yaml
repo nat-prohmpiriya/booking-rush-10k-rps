@@ -19,7 +19,7 @@ spec:
         - name: ghcr-secret
       containers:
         - name: saga-orchestrator
-          image: ghcr.io/nat-prohmpiriya/booking-rush/saga-orchestrator:8865cbf
+          image: ghcr.io/nat-prohmpiriya/booking-rush/saga-orchestrator:16abd1a
           imagePullPolicy: Always
           env:
             - name: SERVICE_NAME
