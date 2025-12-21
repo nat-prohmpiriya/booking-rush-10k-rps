@@ -19,7 +19,7 @@ spec:
         - name: ghcr-secret
       containers:
         - name: inventory-worker
-          image: ghcr.io/nat-prohmpiriya/booking-rush/inventory-worker:latest
+          image: ghcr.io/nat-prohmpiriya/booking-rush/inventory-worker:8865cbf
           imagePullPolicy: Always
           envFrom:
             - configMapRef:
