@@ -338,12 +338,13 @@ func main() {
 	}
 
 	// Create HTTP server with optimized settings
+	// WriteTimeout set to 0 (disabled) because SSE streams need long-lived connections
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
 	srv := &http.Server{
 		Addr:              addr,
 		Handler:           router,
 		ReadTimeout:       5 * time.Second,
-		WriteTimeout:      10 * time.Second,
+		WriteTimeout:      0, // Disabled for SSE streaming (was 10s, caused SSE connection drops)
 		IdleTimeout:       120 * time.Second,
 		ReadHeaderTimeout: 2 * time.Second,
 		MaxHeaderBytes:    1 << 20, // 1MB

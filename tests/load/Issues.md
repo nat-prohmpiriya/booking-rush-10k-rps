@@ -586,3 +586,195 @@ docker exec booking-rush-redis redis-cli -a redis123 CONFIG SET maxclients 20000
 3. **Per-Event = O(1) connections, O(n) messages per publish**
 4. **At scale, O(n) messages ร้ายแรงกว่า O(n) connections**
 5. **Test at actual scale** — ปัญหาบางอย่างเห็นได้เฉพาะที่ 10K users
+
+---
+
+### Issue #6: SSE Connection Timeouts และ Configuration Issues
+
+**Date:** 2025-12-18
+
+---
+
+#### อาการที่พบ
+
+ทดสอบ Virtual Queue SSE (sse_3k scenario) พบว่า:
+- `queue_join_success`: 73.90% → ลดลงเหลือ 46-53% หลังเพิ่ม load
+- `sse_errors`: 203 → พุ่งเป็น 36,000-53,000
+- SSE connections ถูกตัดก่อนได้รับ queue pass
+
+---
+
+#### Root Causes ที่พบ (6 จุด)
+
+| # | Component | ปัญหา | ค่าเดิม | ค่าที่แก้ |
+|---|-----------|-------|---------|----------|
+| 1 | API Gateway | MaxIdleConnsPerHost ต่ำเกินไป | 100 | 15,000 |
+| 2 | API Gateway | Queue route timeout สั้นเกินไป | 30s | 5 minutes |
+| 3 | nginx | SSE location path ผิด | `/api/v1/queue/join` | `~ ^/api/v1/queue/position/.+/stream$` |
+| 4 | nginx | proxy_read_timeout สั้นเกินไป | 60s | 310s |
+| 5 | .env.local | Redis DNS timeout | `redis` (hostname) | `172.19.0.3` (IP) |
+| 6 | Booking Service | **WriteTimeout ตัด SSE** | 10s | 0 (disabled) |
+
+---
+
+#### รายละเอียดการแก้ไข
+
+**1. API Gateway - MaxIdleConnsPerHost**
+
+File: `backend-api-gateway/internal/proxy/proxy.go`
+
+```go
+// Before
+transport := &http.Transport{
+    MaxIdleConns:          100,
+    MaxIdleConnsPerHost:   100,
+}
+
+// After
+transport := &http.Transport{
+    MaxIdleConns:          15000,
+    MaxIdleConnsPerHost:   15000,
+}
+```
+
+**ปัญหา:** SSE แต่ละ connection ใช้ 1 idle connection ถ้ามี 3000 VUs แต่ MaxIdleConnsPerHost เป็น 100 = คอขวด
+
+---
+
+**2. API Gateway - Queue Route Timeout**
+
+File: `backend-api-gateway/internal/proxy/proxy.go`
+
+```go
+// Before
+{
+    PathPrefix:  "/api/v1/queue",
+    Timeout: 30 * time.Second,
+}
+
+// After
+{
+    PathPrefix:  "/api/v1/queue",
+    Timeout: 5 * time.Minute,  // SSE needs long timeout
+}
+```
+
+---
+
+**3. nginx - SSE Location Path**
+
+File: `nginx/nginx-prod.conf`
+
+```nginx
+# Before (WRONG - this is POST endpoint, not SSE)
+location /api/v1/queue/join {
+    proxy_read_timeout 310s;
+}
+
+# After (CORRECT - matches SSE stream endpoint)
+location ~ ^/api/v1/queue/position/.+/stream$ {
+    proxy_pass http://api_gateway;
+    proxy_buffering off;
+    proxy_cache off;
+    proxy_read_timeout 310s;
+    proxy_next_upstream off;
+}
+```
+
+**ปัญหา:** SSE endpoint คือ `/api/v1/queue/position/{event_id}/stream` ไม่ใช่ `/api/v1/queue/join`
+
+---
+
+**4. nginx - keepalive connections**
+
+```nginx
+upstream api_gateway {
+    # Before
+    keepalive 256;
+
+    # After
+    keepalive 1024;
+}
+```
+
+---
+
+**5. Redis DNS Timeout**
+
+File: `.env.local`
+
+```bash
+# Before - DNS timeout under high load
+REDIS_HOST=redis
+
+# After - Direct IP, no DNS lookup
+REDIS_HOST=172.19.0.3
+```
+
+**ปัญหา:** Docker DNS resolution timeout เมื่อ load สูง ทำให้เห็น error: `lookup redis: i/o timeout`
+
+**หมายเหตุ:** IP อาจเปลี่ยนถ้า restart Redis container
+
+---
+
+**6. Booking Service - WriteTimeout (ROOT CAUSE)**
+
+File: `backend-booking/main.go`
+
+```go
+// Before - SSE ถูกตัดหลัง 10 วินาที!
+srv := &http.Server{
+    WriteTimeout: 10 * time.Second,
+}
+
+// After - Disabled for SSE streaming
+srv := &http.Server{
+    WriteTimeout: 0,  // SSE needs unlimited write time
+}
+```
+
+**ปัญหา:** SSE keepalive ส่งทุก 15 วินาที แต่ WriteTimeout เป็น 10 วินาที → Server ปิด connection ก่อนส่ง keepalive ครั้งที่ 2
+
+---
+
+#### ผลการทดสอบ
+
+**Before vs After All Fixes (sse_3k scenario):**
+
+| Metric | Before | After | เปลี่ยนแปลง |
+|--------|--------|-------|-------------|
+| queue_join_success | 52.45% | **83.35%** | +31% 📈 |
+| queue_pass_received | 35.86% | **57.81%** | +22% 📈 |
+| booking_success | 92.58% | **99.26%** | +7% 📈 |
+| booking_duration p(95) | 1,594ms | **14ms** | **113x เร็วขึ้น!** 📈 |
+| sse_errors | 45,031 | **27,276** | -39% 📈 |
+
+---
+
+#### Thresholds Status
+
+| Metric | ผลลัพธ์ | เป้าหมาย | สถานะ |
+|--------|---------|----------|-------|
+| booking_success | 99.26% | > 90% | ✅ PASS |
+| booking_duration p(95) | 14ms | < 2000ms | ✅ PASS |
+| queue_join_success | 83.35% | > 95% | ⚠️ ยังไม่ผ่าน |
+| queue_pass_received | 57.81% | > 80% | ⚠️ ยังไม่ผ่าน |
+
+---
+
+#### บทเรียน
+
+1. **SSE ต้องการ timeout ยาว** — ทุก layer (nginx, gateway, service) ต้อง config ให้สอดคล้องกัน
+2. **WriteTimeout = 0** สำหรับ streaming — Go HTTP server default จะตัด connection ที่เขียนนานเกิน timeout
+3. **Location path ต้องถูกต้อง** — nginx regex location ต้อง match กับ actual endpoint
+4. **DNS timeout under load** — ใช้ IP address แทน hostname สำหรับ high-traffic services
+5. **Connection pooling สำคัญ** — MaxIdleConnsPerHost ต้องมากพอสำหรับ concurrent connections
+
+---
+
+#### Remaining Issues
+
+ยังมี `sse_errors: 27,276` (43% ของ connections) ต้องตรวจสอบเพิ่มเติม:
+- Queue release worker อาจปล่อย pass ไม่ทัน
+- Redis Pub/Sub อาจมี bottleneck
+- k6 SSE client อาจมีข้อจำกัด
