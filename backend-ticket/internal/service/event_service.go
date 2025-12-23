@@ -141,7 +141,7 @@ func (s *eventService) ListEvents(ctx context.Context, filter *dto.EventListFilt
 // ListPublishedEvents lists all published public events
 func (s *eventService) ListPublishedEvents(ctx context.Context, limit, offset int) ([]*domain.Event, int, error) {
 	if limit <= 0 || limit > 100 {
-		limit = 20
+		limit = 50
 	}
 	if offset < 0 {
 		offset = 0

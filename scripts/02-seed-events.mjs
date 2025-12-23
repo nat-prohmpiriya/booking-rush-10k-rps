@@ -27,6 +27,10 @@ const colors = {
   reset: '\x1b[0m'
 };
 
+// Delay function to avoid rate limiting
+const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+const DELAY_MS = 2000; // 2 seconds between API calls
+
 function log(color, message) {
   console.log(`${colors[color]}${message}${colors.reset}`);
 }
@@ -53,6 +57,8 @@ async function login() {
 }
 
 async function createEvent(eventData) {
+  await delay(DELAY_MS);
+
   const res = await fetch(`${API_BASE_URL}/events`, {
     method: 'POST',
     headers: {
@@ -73,33 +79,59 @@ async function createEvent(eventData) {
 }
 
 async function createShow(eventId, showData) {
-  const res = await fetch(`${API_BASE_URL}/events/${eventId}/shows`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${ACCESS_TOKEN}`
-    },
-    body: JSON.stringify(showData)
-  });
+  await delay(DELAY_MS);
 
-  const data = await res.json();
-  if (!data.success) return null;
-  return data.data.id;
+  try {
+    const res = await fetch(`${API_BASE_URL}/events/${eventId}/shows`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${ACCESS_TOKEN}`
+      },
+      body: JSON.stringify(showData)
+    });
+
+    const text = await res.text();
+    try {
+      const data = JSON.parse(text);
+      if (!data.success) return null;
+      return data.data.id;
+    } catch (e) {
+      log('red', `  Show error: Invalid JSON response`);
+      return null;
+    }
+  } catch (e) {
+    log('red', `  Show error: ${e.message}`);
+    return null;
+  }
 }
 
 async function createZone(showId, zoneData) {
-  const res = await fetch(`${API_BASE_URL}/shows/${showId}/zones`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${ACCESS_TOKEN}`
-    },
-    body: JSON.stringify(zoneData)
-  });
+  await delay(DELAY_MS);
 
-  const data = await res.json();
-  if (!data.success) return null;
-  return data.data.id;
+  try {
+    const res = await fetch(`${API_BASE_URL}/shows/${showId}/zones`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${ACCESS_TOKEN}`
+      },
+      body: JSON.stringify(zoneData)
+    });
+
+    const text = await res.text();
+    try {
+      const data = JSON.parse(text);
+      if (!data.success) return null;
+      return data.data.id;
+    } catch (e) {
+      log('red', `  Zone error: Invalid JSON response`);
+      return null;
+    }
+  } catch (e) {
+    log('red', `  Zone error: ${e.message}`);
+    return null;
+  }
 }
 
 async function publishEvent(eventId) {

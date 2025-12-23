@@ -57,9 +57,10 @@ function EventListSkeleton() {
 type ViewMode = "grid" | "list"
 
 const ITEMS_PER_PAGE = 9
+const API_LIMIT = 100 // Fetch all events from API
 
 export default function EventsPage() {
-  const { events, isLoading, total } = useEvents()
+  const { events, isLoading, total } = useEvents({ limit: API_LIMIT })
   const [searchQuery, setSearchQuery] = useState("")
   const [sortBy, setSortBy] = useState("date")
   const [viewMode, setViewMode] = useState<ViewMode>("grid")

@@ -37,7 +37,7 @@ func (h *EventHandler) List(c *gin.Context) {
 	c.Request = c.Request.WithContext(ctx)
 
 	// Parse pagination params
-	limit := 20
+	limit := 50
 	offset := 0
 	if l := c.Query("limit"); l != "" {
 		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 && parsed <= 100 {
@@ -189,7 +189,7 @@ func (h *EventHandler) ListMyEvents(c *gin.Context) {
 	span.SetAttributes(attribute.String("organizer_id", userID))
 
 	// Parse pagination params
-	limit := 20
+	limit := 50
 	offset := 0
 	if l := c.Query("limit"); l != "" {
 		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 && parsed <= 100 {
