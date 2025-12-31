@@ -234,7 +234,7 @@ function FAQCategorySection({ category }: { category: FAQCategory }) {
   const Icon = category.icon
 
   return (
-    <div id={category.id} className="glass rounded-xl border border-border/50 overflow-hidden scroll-mt-32">
+    <div id={category.id} data-testid={`faq-category-${category.id}`} className="glass rounded-xl border border-border/50 overflow-hidden scroll-mt-32">
       <div className="p-6 border-b border-border/50 bg-primary/5">
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 rounded-lg bg-primary/20 flex items-center justify-center">
@@ -244,7 +244,7 @@ function FAQCategorySection({ category }: { category: FAQCategory }) {
         </div>
       </div>
       <div className="p-6">
-        <Accordion type="single" collapsible className="w-full">
+        <Accordion data-testid="faq-accordion" type="single" collapsible className="w-full">
           {category.items.map((item, index) => (
             <AccordionItem key={index} value={`item-${index}`} className="border-border/50">
               <AccordionTrigger className="text-left hover:text-primary hover:no-underline">
@@ -279,11 +279,11 @@ export default function FAQPage() {
   const totalResults = filteredCategories.reduce((sum, cat) => sum + cat.items.length, 0)
 
   return (
-    <main className="min-h-screen bg-background">
+    <main data-testid="faq-page" className="min-h-screen bg-background">
       <Header />
 
       {/* Hero Section */}
-      <section className="relative pt-24 pb-12 lg:pt-32 lg:pb-16 overflow-hidden">
+      <section data-testid="faq-hero" className="relative pt-24 pb-12 lg:pt-32 lg:pb-16 overflow-hidden">
         {/* Background */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,var(--tw-gradient-stops))] from-primary/20 via-background to-background" />
         <div className="absolute inset-0 bg-[url('/images/grid-pattern.svg')] opacity-5" />
@@ -348,7 +348,7 @@ export default function FAQPage() {
       </section>
 
       {/* FAQ Content */}
-      <section className="container mx-auto px-4 lg:px-8 pb-16 lg:pb-24">
+      <section data-testid="faq-questions" className="container mx-auto px-4 lg:px-8 pb-16 lg:pb-24">
         <div className="max-w-4xl mx-auto space-y-8">
           {filteredCategories.length > 0 ? (
             filteredCategories.map((category) => (

@@ -5,11 +5,11 @@ import { Rocket, Clock } from "lucide-react"
 
 export default function AboutPage() {
   return (
-    <main className="min-h-screen bg-background">
+    <main data-testid="about-page" className="min-h-screen bg-background">
       <Header />
 
       {/* Hero Section */}
-      <section className="relative pt-24 pb-12 lg:pt-32 lg:pb-16 overflow-hidden">
+      <section data-testid="about-hero" className="relative pt-24 pb-12 lg:pt-32 lg:pb-16 overflow-hidden">
         {/* Background */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,var(--tw-gradient-stops))] from-primary/20 via-background to-background" />
         <div className="absolute inset-0 bg-[url('/images/grid-pattern.svg')] opacity-5" />
@@ -33,9 +33,9 @@ export default function AboutPage() {
       </section>
 
       {/* Coming Soon Content */}
-      <section className="container mx-auto px-4 lg:px-8 pb-16 lg:pb-24">
+      <section data-testid="about-content" className="container mx-auto px-4 lg:px-8 pb-16 lg:pb-24">
         <div className="max-w-2xl mx-auto">
-          <div className="glass rounded-xl border border-primary/30 p-12 text-center">
+          <div data-testid="about-team-section" className="glass rounded-xl border border-primary/30 p-12 text-center">
             <div className="inline-block p-6 rounded-full bg-primary/20 mb-6">
               <Clock className="h-12 w-12 text-primary" />
             </div>

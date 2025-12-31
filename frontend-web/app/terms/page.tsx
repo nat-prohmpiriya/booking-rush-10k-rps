@@ -5,11 +5,11 @@ import { FileText, CheckCircle, XCircle, AlertTriangle, Scale, Mail } from "luci
 
 export default function TermsOfServicePage() {
   return (
-    <main className="min-h-screen bg-background">
+    <main data-testid="terms-page" className="min-h-screen bg-background">
       <Header />
 
       {/* Hero Section */}
-      <section className="relative pt-24 pb-12 lg:pt-32 lg:pb-16 overflow-hidden">
+      <section data-testid="terms-hero" className="relative pt-24 pb-12 lg:pt-32 lg:pb-16 overflow-hidden">
         {/* Background */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,var(--tw-gradient-stops))] from-primary/20 via-background to-background" />
         <div className="absolute inset-0 bg-[url('/images/grid-pattern.svg')] opacity-5" />
@@ -36,7 +36,7 @@ export default function TermsOfServicePage() {
       </section>
 
       {/* Content */}
-      <section className="container mx-auto px-4 lg:px-8 pb-16 lg:pb-24">
+      <section data-testid="terms-content" className="container mx-auto px-4 lg:px-8 pb-16 lg:pb-24">
         <div className="max-w-4xl mx-auto space-y-12">
           {/* Introduction */}
           <div className="glass rounded-xl p-8 border border-border/50">
