@@ -452,7 +452,7 @@ function RecentBookings() {
 // Main Analytics Page
 export default function AnalyticsPage() {
   return (
-    <div className="space-y-8">
+    <div className="space-y-8" data-testid="organizer-analytics-page">
       <div>
         <h1 className="text-3xl font-bold">Analytics</h1>
         <p className="text-muted-foreground">
@@ -461,10 +461,12 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Overview Stats */}
-      <OverviewCards />
+      <div data-testid="organizer-analytics-stats">
+        <OverviewCards />
+      </div>
 
       {/* Charts & Lists */}
-      <div className="grid gap-4 lg:grid-cols-4">
+      <div className="grid gap-4 lg:grid-cols-4" data-testid="organizer-analytics-charts">
         {/* Sales Chart - Full Width */}
         <SalesChart />
 

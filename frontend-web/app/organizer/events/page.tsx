@@ -92,7 +92,7 @@ export default function OrganizerEventsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid="organizer-events-page">
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -102,7 +102,7 @@ export default function OrganizerEventsPage() {
           </p>
         </div>
         <Link href="/organizer/events/new">
-          <Button>
+          <Button data-testid="organizer-events-create-button">
             <Plus className="h-4 w-4 mr-2" />
             Create Event
           </Button>
@@ -110,7 +110,7 @@ export default function OrganizerEventsPage() {
       </div>
 
       {/* Search */}
-      <div className="relative max-w-md">
+      <div className="relative max-w-md" data-testid="organizer-events-search">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
           placeholder="Search events..."
@@ -156,7 +156,7 @@ export default function OrganizerEventsPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3" data-testid="organizer-events-list">
           {filteredEvents.map((event) => (
             <Card key={event.id} className="overflow-hidden group">
               <div className="relative h-40 bg-muted">

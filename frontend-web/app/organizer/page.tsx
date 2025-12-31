@@ -86,7 +86,7 @@ export default function OrganizerDashboard() {
   ]
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8" data-testid="organizer-dashboard-page">
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -96,7 +96,7 @@ export default function OrganizerDashboard() {
           </p>
         </div>
         <Link href="/organizer/events/new">
-          <Button>
+          <Button data-testid="organizer-create-event-button">
             <Plus className="h-4 w-4 mr-2" />
             Create Event
           </Button>
@@ -104,7 +104,7 @@ export default function OrganizerDashboard() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4" data-testid="organizer-stats">
         {statCards.map((stat) => (
           <Card key={stat.title}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -129,7 +129,7 @@ export default function OrganizerDashboard() {
       </div>
 
       {/* Recent Events */}
-      <Card>
+      <Card data-testid="organizer-events-section">
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle>Recent Events</CardTitle>

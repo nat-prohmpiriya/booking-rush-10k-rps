@@ -196,7 +196,7 @@ export default function CreateEventPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 max-w-4xl" data-testid="organizer-new-event-page">
       {/* Page Header */}
       <div className="flex items-center gap-4">
         <Link href="/organizer/events">
@@ -218,7 +218,7 @@ export default function CreateEventPage() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-6" data-testid="organizer-new-event-form">
         {/* Basic Info */}
         <Card>
           <CardHeader>
@@ -235,6 +235,7 @@ export default function CreateEventPage() {
                   onChange={(e) => handleEventChange("name", e.target.value)}
                   placeholder="e.g., BTS World Tour"
                   required
+                  data-testid="organizer-event-name-input"
                 />
               </div>
               <div className="space-y-2">
@@ -266,6 +267,7 @@ export default function CreateEventPage() {
                 onChange={(e) => handleEventChange("description", e.target.value)}
                 placeholder="Detailed description of your event"
                 className="min-h-[100px]"
+                data-testid="organizer-event-description-input"
               />
             </div>
 
@@ -479,7 +481,7 @@ export default function CreateEventPage() {
               Cancel
             </Button>
           </Link>
-          <Button type="submit" disabled={isSubmitting}>
+          <Button type="submit" disabled={isSubmitting} data-testid="organizer-event-submit-button">
             {isSubmitting ? "Creating..." : "Create Event"}
           </Button>
         </div>

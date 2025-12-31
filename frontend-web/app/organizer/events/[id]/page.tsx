@@ -297,7 +297,7 @@ export default function EditEventPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-5xl">
+    <div className="space-y-6 max-w-5xl" data-testid="organizer-event-detail-page">
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -306,7 +306,7 @@ export default function EditEventPage() {
               <ArrowLeft className="h-4 w-4" />
             </Button>
           </Link>
-          <div>
+          <div data-testid="organizer-event-info">
             <div className="flex items-center gap-3">
               <h1 className="text-3xl font-bold">{event.name}</h1>
               {getStatusBadge(event.status)}
@@ -345,7 +345,7 @@ export default function EditEventPage() {
             />
           </div>
           <Link href={`/events/${event.id}`} target="_blank">
-            <Button variant="outline">
+            <Button variant="outline" data-testid="organizer-event-edit-button">
               <Eye className="h-4 w-4 mr-2" />
               View Public
             </Button>
@@ -540,7 +540,7 @@ export default function EditEventPage() {
         </TabsContent>
 
         {/* Shows Tab */}
-        <TabsContent value="shows" className="space-y-4">
+        <TabsContent value="shows" className="space-y-4" data-testid="organizer-event-shows">
           {shows.length === 0 ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
@@ -702,7 +702,7 @@ export default function EditEventPage() {
         </TabsContent>
 
         {/* Zones Tab */}
-        <TabsContent value="zones" className="space-y-4">
+        <TabsContent value="zones" className="space-y-4" data-testid="organizer-event-zones">
           {shows.length === 0 ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
