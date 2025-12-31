@@ -66,21 +66,22 @@ export default function UsersPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div data-testid="admin-users-page" className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Users</h1>
+        <h1 data-testid="admin-users-title" className="text-3xl font-bold">Users</h1>
         <p className="text-muted-foreground">
           Manage user accounts and roles
         </p>
       </div>
 
       {/* Filters */}
-      <Card>
+      <Card data-testid="admin-users-filters">
         <CardContent className="pt-6">
           <form onSubmit={handleSearch} className="flex gap-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
+                data-testid="admin-users-search"
                 placeholder="Search by name or email..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -88,7 +89,7 @@ export default function UsersPage() {
               />
             </div>
             <Select value={role} onValueChange={(v) => { setRole(v); setPage(1); }}>
-              <SelectTrigger className="w-40">
+              <SelectTrigger data-testid="admin-users-filter" className="w-40">
                 <SelectValue placeholder="All roles" />
               </SelectTrigger>
               <SelectContent>
@@ -105,7 +106,7 @@ export default function UsersPage() {
       </Card>
 
       {/* Users Table */}
-      <Card>
+      <Card data-testid="admin-users-table-card">
         <CardHeader>
           <CardTitle>All Users</CardTitle>
           <CardDescription>
@@ -136,7 +137,7 @@ export default function UsersPage() {
             </div>
           ) : (
             <>
-              <Table>
+              <Table data-testid="admin-users-table">
                 <TableHeader>
                   <TableRow>
                     <TableHead>User</TableHead>
@@ -180,7 +181,7 @@ export default function UsersPage() {
 
               {/* Pagination */}
               {data.meta && data.meta.total_pages > 1 && (
-                <div className="flex items-center justify-between mt-4">
+                <div data-testid="admin-users-pagination" className="flex items-center justify-between mt-4">
                   <p className="text-sm text-muted-foreground">
                     Page {data.meta.page} of {data.meta.total_pages}
                   </p>

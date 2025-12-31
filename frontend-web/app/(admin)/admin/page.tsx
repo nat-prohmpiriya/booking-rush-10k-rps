@@ -105,9 +105,9 @@ function SystemStatsCards() {
   ]
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+    <div data-testid="admin-stats-cards" className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       {stats.map((stat) => (
-        <Card key={stat.title}>
+        <Card key={stat.title} data-testid={`admin-stat-card-${stat.title.toLowerCase().replace(/\s+/g, '-')}`}>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               {stat.title}
@@ -173,10 +173,10 @@ function QuickLinks() {
   ]
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+    <div data-testid="admin-quick-links" className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       {links.map((link) => (
         <Link key={link.href} href={link.href}>
-          <Card className="hover:border-primary/50 transition-colors cursor-pointer h-full">
+          <Card data-testid={`admin-quick-link-${link.title.toLowerCase().replace(/\s+/g, '-')}`} className="hover:border-primary/50 transition-colors cursor-pointer h-full">
             <CardHeader>
               <div className="flex items-center gap-3">
                 <link.icon className={`h-5 w-5 ${link.color}`} />
@@ -205,7 +205,7 @@ function RecentBookingsSection() {
   }
 
   return (
-    <Card>
+    <Card data-testid="admin-recent-bookings">
       <CardHeader>
         <CardTitle>Recent Bookings</CardTitle>
         <CardDescription>Latest bookings across all events</CardDescription>
@@ -269,7 +269,7 @@ function SystemHealth() {
   ]
 
   return (
-    <Card>
+    <Card data-testid="admin-system-health">
       <CardHeader>
         <CardTitle>System Health</CardTitle>
         <CardDescription>Service status overview</CardDescription>
@@ -301,9 +301,9 @@ function SystemHealth() {
 // Main Admin Dashboard
 export default function AdminDashboardPage() {
   return (
-    <div className="space-y-8">
+    <div data-testid="admin-dashboard-page" className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+        <h1 data-testid="admin-dashboard-title" className="text-3xl font-bold">Admin Dashboard</h1>
         <p className="text-muted-foreground">
           System overview and management
         </p>
@@ -319,7 +319,7 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* Recent Activity & Health */}
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div data-testid="admin-recent-activity" className="grid gap-4 lg:grid-cols-2">
         <RecentBookingsSection />
         <SystemHealth />
       </div>

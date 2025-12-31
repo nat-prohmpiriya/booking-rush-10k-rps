@@ -68,20 +68,20 @@ export default function AdminEventsPage() {
   })
 
   return (
-    <div className="space-y-6">
+    <div data-testid="admin-events-page" className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">All Events</h1>
+        <h1 data-testid="admin-events-title" className="text-3xl font-bold">All Events</h1>
         <p className="text-muted-foreground">
           View all events across all organizers
         </p>
       </div>
 
       {/* Filters */}
-      <Card>
+      <Card data-testid="admin-events-filters">
         <CardContent className="pt-6">
           <div className="flex gap-4">
             <Select value={status} onValueChange={(v) => { setStatus(v); setPage(1); }}>
-              <SelectTrigger className="w-40">
+              <SelectTrigger data-testid="admin-events-filter" className="w-40">
                 <SelectValue placeholder="All status" />
               </SelectTrigger>
               <SelectContent>
@@ -97,7 +97,7 @@ export default function AdminEventsPage() {
       </Card>
 
       {/* Events Table */}
-      <Card>
+      <Card data-testid="admin-events-table-card">
         <CardHeader>
           <CardTitle>Events</CardTitle>
           <CardDescription>
@@ -128,7 +128,7 @@ export default function AdminEventsPage() {
             </div>
           ) : (
             <>
-              <Table>
+              <Table data-testid="admin-events-table">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Event</TableHead>
@@ -206,7 +206,7 @@ export default function AdminEventsPage() {
 
               {/* Pagination */}
               {data.meta && data.meta.total_pages > 1 && (
-                <div className="flex items-center justify-between mt-4">
+                <div data-testid="admin-events-pagination" className="flex items-center justify-between mt-4">
                   <p className="text-sm text-muted-foreground">
                     Page {data.meta.page} of {data.meta.total_pages}
                   </p>

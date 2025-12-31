@@ -70,21 +70,22 @@ export default function TenantsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div data-testid="admin-tenants-page" className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Tenants</h1>
+        <h1 data-testid="admin-tenants-title" className="text-3xl font-bold">Tenants</h1>
         <p className="text-muted-foreground">
           Manage organization tenants
         </p>
       </div>
 
       {/* Filters */}
-      <Card>
+      <Card data-testid="admin-tenants-filters">
         <CardContent className="pt-6">
           <form onSubmit={handleSearch} className="flex gap-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
+                data-testid="admin-tenants-search"
                 placeholder="Search by name..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -92,7 +93,7 @@ export default function TenantsPage() {
               />
             </div>
             <Select value={status} onValueChange={(v) => { setStatus(v); setPage(1); }}>
-              <SelectTrigger className="w-40">
+              <SelectTrigger data-testid="admin-tenants-filter" className="w-40">
                 <SelectValue placeholder="All status" />
               </SelectTrigger>
               <SelectContent>
@@ -102,13 +103,13 @@ export default function TenantsPage() {
                 <SelectItem value="suspended">Suspended</SelectItem>
               </SelectContent>
             </Select>
-            <Button type="submit">Search</Button>
+            <Button data-testid="admin-tenants-search-button" type="submit">Search</Button>
           </form>
         </CardContent>
       </Card>
 
       {/* Tenants Table */}
-      <Card>
+      <Card data-testid="admin-tenants-table-card">
         <CardHeader>
           <CardTitle>All Tenants</CardTitle>
           <CardDescription>
@@ -139,7 +140,7 @@ export default function TenantsPage() {
             </div>
           ) : (
             <>
-              <Table>
+              <Table data-testid="admin-tenants-table">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Tenant</TableHead>
@@ -206,7 +207,7 @@ export default function TenantsPage() {
 
               {/* Pagination */}
               {data.meta && data.meta.total_pages > 1 && (
-                <div className="flex items-center justify-between mt-4">
+                <div data-testid="admin-tenants-pagination" className="flex items-center justify-between mt-4">
                   <p className="text-sm text-muted-foreground">
                     Page {data.meta.page} of {data.meta.total_pages}
                   </p>

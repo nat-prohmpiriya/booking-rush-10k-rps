@@ -118,9 +118,9 @@ function OverviewCards() {
   ]
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+    <div data-testid="admin-analytics-stats" className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       {stats.map((stat) => (
-        <Card key={stat.title}>
+        <Card key={stat.title} data-testid={`admin-analytics-stat-${stat.title.toLowerCase().replace(/\s+/g, '-')}`}>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               {stat.title}
@@ -174,7 +174,7 @@ function RevenueChart() {
   })) || []
 
   return (
-    <Card className="col-span-3">
+    <Card data-testid="admin-analytics-revenue-chart" className="col-span-3">
       <CardHeader className="flex flex-row items-center justify-between">
         <div>
           <CardTitle>Revenue Trend</CardTitle>
@@ -276,7 +276,7 @@ function TopEventsChart() {
   })) || []
 
   return (
-    <Card>
+    <Card data-testid="admin-analytics-top-events-chart">
       <CardHeader>
         <CardTitle>Top Events</CardTitle>
         <CardDescription>By revenue</CardDescription>
@@ -353,7 +353,7 @@ function SummaryStats() {
   ]
 
   return (
-    <Card>
+    <Card data-testid="admin-analytics-summary">
       <CardHeader>
         <CardTitle>Period Summary</CardTitle>
         <CardDescription>
@@ -377,9 +377,9 @@ function SummaryStats() {
 // Main Admin Analytics Page
 export default function AdminAnalyticsPage() {
   return (
-    <div className="space-y-8">
+    <div data-testid="admin-analytics-page" className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold">System Analytics</h1>
+        <h1 data-testid="admin-analytics-title" className="text-3xl font-bold">System Analytics</h1>
         <p className="text-muted-foreground">
           Platform-wide performance metrics
         </p>
@@ -389,7 +389,7 @@ export default function AdminAnalyticsPage() {
       <OverviewCards />
 
       {/* Charts */}
-      <div className="grid gap-4 lg:grid-cols-4">
+      <div data-testid="admin-analytics-charts" className="grid gap-4 lg:grid-cols-4">
         <RevenueChart />
         <SummaryStats />
       </div>
