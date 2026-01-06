@@ -5,7 +5,11 @@ import {
   OnModuleDestroy,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Kafka, Consumer, EachMessagePayload } from 'kafkajs';
+import { Kafka, Consumer, EachMessagePayload, CompressionTypes, CompressionCodecs } from 'kafkajs';
+import SnappyCodec from 'kafkajs-snappy';
+
+// Register Snappy codec for KafkaJS
+CompressionCodecs[CompressionTypes.Snappy] = SnappyCodec;
 import { BookingEventHandler } from './handlers/booking-event.handler';
 import {
   EventType,
