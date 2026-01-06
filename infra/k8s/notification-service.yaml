@@ -19,7 +19,7 @@ spec:
         - name: ghcr-secret
       containers:
         - name: notification-service
-          image: ghcr.io/nat-prohmpiriya/booking-rush/notification-service:ff4cd0f
+          image: ghcr.io/nat-prohmpiriya/booking-rush/notification-service:ef6bfb3
           imagePullPolicy: Always
           ports:
             - containerPort: 8085
