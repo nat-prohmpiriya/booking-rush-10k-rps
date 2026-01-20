@@ -19,7 +19,7 @@ spec:
         - name: ghcr-secret
       containers:
         - name: queue-release-worker
-          image: ghcr.io/nat-prohmpiriya/booking-rush/queue-release-worker:16abd1a
+          image: ghcr.io/nat-prohmpiriya/booking-rush/queue-release-worker:dffada3
           imagePullPolicy: Always
           envFrom:
             - configMapRef:
