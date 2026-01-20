@@ -86,7 +86,7 @@ data:
 
   # Booking
   RESERVATION_TTL_MINUTES: "10"
-  MAX_TICKETS_PER_USER: "4"
+  MAX_TICKETS_PER_USER: "100"
   VIRTUAL_QUEUE_BATCH_SIZE: "100"
 
   # Internal Service URLs
