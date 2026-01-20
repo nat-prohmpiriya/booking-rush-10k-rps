@@ -19,7 +19,7 @@ spec:
         - name: ghcr-secret
       containers:
         - name: api-gateway
-          image: ghcr.io/nat-prohmpiriya/booking-rush/api-gateway:5237e18
+          image: ghcr.io/nat-prohmpiriya/booking-rush/api-gateway:bea33a2
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
