@@ -263,15 +263,41 @@ func (rl *RedisRateLimiter) AllowWithRemaining(ctx context.Context, key string, 
 		return false, 0, fmt.Errorf("unexpected result length: %d", len(values))
 	}
 
-	allowed, _ := values[0].(int64)
+	// Safe type conversion for allowed flag - handle multiple types Redis may return
+	allowed := int64(0)
+	switch v := values[0].(type) {
+	case int64:
+		allowed = v
+	case int:
+		allowed = int64(v)
+	case float64:
+		allowed = int64(v)
+	case string:
+		// Try parsing as integer first, then float
+		if i, err := strconv.ParseInt(v, 10, 64); err == nil {
+			allowed = i
+		} else if f, err := strconv.ParseFloat(v, 64); err == nil {
+			allowed = int64(f)
+		}
+	case nil:
+		// Redis returned null, default to 0 (not allowed)
+		allowed = 0
+	}
+
+	// Safe type conversion for remaining tokens
 	remaining := float64(0)
 	switch v := values[1].(type) {
 	case int64:
+		remaining = float64(v)
+	case int:
 		remaining = float64(v)
 	case float64:
 		remaining = v
 	case string:
 		remaining, _ = strconv.ParseFloat(v, 64)
+	case nil:
+		// Redis returned null, default to 0
+		remaining = 0
 	}
 
 	return allowed == 1, remaining, nil
@@ -591,6 +617,20 @@ func PerEndpointRateLimiter(config PerEndpointRateLimitConfig) gin.HandlerFunc {
 	}
 
 	return func(c *gin.Context) {
+		// Add panic recovery for rate limiter
+		defer func() {
+			if r := recover(); r != nil {
+				// Log the panic and allow request to proceed (fail open)
+				span := telemetry.SpanFromContext(c.Request.Context())
+				if span != nil {
+					span.SetStatus(codes.Error, fmt.Sprintf("rate limiter panic: %v", r))
+					span.RecordError(fmt.Errorf("panic: %v", r))
+				}
+				// Allow request to proceed on panic
+				c.Next()
+			}
+		}()
+
 		ctx, span := telemetry.StartSpan(c.Request.Context(), "middleware.per_endpoint_rate_limiter")
 		defer span.End()
 		c.Request = c.Request.WithContext(ctx)
