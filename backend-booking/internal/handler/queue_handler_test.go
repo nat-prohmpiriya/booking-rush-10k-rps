@@ -53,6 +53,24 @@ func (m *MockQueueService) GetQueueStatus(ctx context.Context, eventID string) (
 	return args.Get(0).(*dto.QueueStatusResponse), args.Error(1)
 }
 
+func (m *MockQueueService) ValidateQueuePass(ctx context.Context, userID, eventID, queuePass string) error {
+	args := m.Called(ctx, userID, eventID, queuePass)
+	return args.Error(0)
+}
+
+func (m *MockQueueService) DeleteQueuePass(ctx context.Context, userID, eventID string) error {
+	args := m.Called(ctx, userID, eventID)
+	return args.Error(0)
+}
+
+// newTestQueueHandler creates a QueueHandler for testing
+func newTestQueueHandler(queueService *MockQueueService) *QueueHandler {
+	return &QueueHandler{
+		queueService: queueService,
+		redisClient:  nil, // redis.Client can be nil for tests
+	}
+}
+
 func setupQueueTestRouter(handler *QueueHandler) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
@@ -79,7 +97,7 @@ func setupQueueTestRouter(handler *QueueHandler) *gin.Engine {
 
 func TestQueueHandler_JoinQueue_Success(t *testing.T) {
 	mockService := new(MockQueueService)
-	handler := NewQueueHandler(mockService)
+	handler := newTestQueueHandler(mockService)
 	router := setupQueueTestRouter(handler)
 
 	now := time.Now()
@@ -119,7 +137,7 @@ func TestQueueHandler_JoinQueue_Success(t *testing.T) {
 
 func TestQueueHandler_JoinQueue_Unauthorized(t *testing.T) {
 	mockService := new(MockQueueService)
-	handler := NewQueueHandler(mockService)
+	handler := newTestQueueHandler(mockService)
 	router := setupQueueTestRouter(handler)
 
 	reqBody := dto.JoinQueueRequest{
@@ -139,7 +157,7 @@ func TestQueueHandler_JoinQueue_Unauthorized(t *testing.T) {
 
 func TestQueueHandler_JoinQueue_InvalidRequest(t *testing.T) {
 	mockService := new(MockQueueService)
-	handler := NewQueueHandler(mockService)
+	handler := newTestQueueHandler(mockService)
 	router := setupQueueTestRouter(handler)
 
 	// Missing required field
@@ -158,7 +176,7 @@ func TestQueueHandler_JoinQueue_InvalidRequest(t *testing.T) {
 
 func TestQueueHandler_JoinQueue_AlreadyInQueue(t *testing.T) {
 	mockService := new(MockQueueService)
-	handler := NewQueueHandler(mockService)
+	handler := newTestQueueHandler(mockService)
 	router := setupQueueTestRouter(handler)
 
 	mockService.On("JoinQueue", mock.Anything, "user-123", mock.AnythingOfType("*dto.JoinQueueRequest")).Return(nil, domain.ErrAlreadyInQueue)
@@ -187,7 +205,7 @@ func TestQueueHandler_JoinQueue_AlreadyInQueue(t *testing.T) {
 
 func TestQueueHandler_GetPosition_Success(t *testing.T) {
 	mockService := new(MockQueueService)
-	handler := NewQueueHandler(mockService)
+	handler := newTestQueueHandler(mockService)
 	router := setupQueueTestRouter(handler)
 
 	expectedResponse := &dto.QueuePositionResponse{
@@ -219,7 +237,7 @@ func TestQueueHandler_GetPosition_Success(t *testing.T) {
 
 func TestQueueHandler_GetPosition_NotInQueue(t *testing.T) {
 	mockService := new(MockQueueService)
-	handler := NewQueueHandler(mockService)
+	handler := newTestQueueHandler(mockService)
 	router := setupQueueTestRouter(handler)
 
 	mockService.On("GetPosition", mock.Anything, "user-123", "event-123").Return(nil, domain.ErrNotInQueue)
@@ -242,7 +260,7 @@ func TestQueueHandler_GetPosition_NotInQueue(t *testing.T) {
 
 func TestQueueHandler_LeaveQueue_Success(t *testing.T) {
 	mockService := new(MockQueueService)
-	handler := NewQueueHandler(mockService)
+	handler := newTestQueueHandler(mockService)
 	router := setupQueueTestRouter(handler)
 
 	expectedResponse := &dto.LeaveQueueResponse{
@@ -277,7 +295,7 @@ func TestQueueHandler_LeaveQueue_Success(t *testing.T) {
 
 func TestQueueHandler_LeaveQueue_InvalidToken(t *testing.T) {
 	mockService := new(MockQueueService)
-	handler := NewQueueHandler(mockService)
+	handler := newTestQueueHandler(mockService)
 	router := setupQueueTestRouter(handler)
 
 	mockService.On("LeaveQueue", mock.Anything, "user-123", mock.AnythingOfType("*dto.LeaveQueueRequest")).Return(nil, domain.ErrInvalidQueueToken)
@@ -307,7 +325,7 @@ func TestQueueHandler_LeaveQueue_InvalidToken(t *testing.T) {
 
 func TestQueueHandler_GetQueueStatus_Success(t *testing.T) {
 	mockService := new(MockQueueService)
-	handler := NewQueueHandler(mockService)
+	handler := newTestQueueHandler(mockService)
 	router := setupQueueTestRouter(handler)
 
 	expectedResponse := &dto.QueueStatusResponse{
@@ -337,7 +355,7 @@ func TestQueueHandler_GetQueueStatus_Success(t *testing.T) {
 
 func TestQueueHandler_QueueFull(t *testing.T) {
 	mockService := new(MockQueueService)
-	handler := NewQueueHandler(mockService)
+	handler := newTestQueueHandler(mockService)
 	router := setupQueueTestRouter(handler)
 
 	mockService.On("JoinQueue", mock.Anything, "user-123", mock.AnythingOfType("*dto.JoinQueueRequest")).Return(nil, domain.ErrQueueFull)
@@ -366,7 +384,7 @@ func TestQueueHandler_QueueFull(t *testing.T) {
 
 func TestQueueHandler_GetPosition_WithQueuePass(t *testing.T) {
 	mockService := new(MockQueueService)
-	handler := NewQueueHandler(mockService)
+	handler := newTestQueueHandler(mockService)
 	router := setupQueueTestRouter(handler)
 
 	now := time.Now()
@@ -402,7 +420,7 @@ func TestQueueHandler_GetPosition_WithQueuePass(t *testing.T) {
 
 func TestQueueHandler_GetPosition_NoQueuePassWhenNotReady(t *testing.T) {
 	mockService := new(MockQueueService)
-	handler := NewQueueHandler(mockService)
+	handler := newTestQueueHandler(mockService)
 	router := setupQueueTestRouter(handler)
 
 	expectedResponse := &dto.QueuePositionResponse{

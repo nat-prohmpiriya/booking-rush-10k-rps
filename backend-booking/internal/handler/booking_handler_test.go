@@ -90,6 +90,15 @@ func (m *MockBookingService) ExpireReservations(ctx context.Context, limit int) 
 	return 0, nil
 }
 
+// newTestBookingHandler creates a BookingHandler for testing with mock services
+func newTestBookingHandler(bookingService *MockBookingService) *BookingHandler {
+	return &BookingHandler{
+		bookingService:   bookingService,
+		queueService:     &MockQueueService{},
+		requireQueuePass: false,
+	}
+}
+
 func setupTestRouter(handler *BookingHandler) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
@@ -201,7 +210,7 @@ func TestBookingHandler_ReserveSeats(t *testing.T) {
 			mockService := &MockBookingService{
 				ReserveSeatsFunc: tt.mockFunc,
 			}
-			handler := NewBookingHandler(mockService)
+			handler := newTestBookingHandler(mockService)
 
 			var router *gin.Engine
 			if tt.userID != "" {
@@ -302,7 +311,7 @@ func TestBookingHandler_ConfirmBooking(t *testing.T) {
 			mockService := &MockBookingService{
 				ConfirmBookingFunc: tt.mockFunc,
 			}
-			handler := NewBookingHandler(mockService)
+			handler := newTestBookingHandler(mockService)
 
 			var router *gin.Engine
 			if tt.userID != "" {
@@ -393,7 +402,7 @@ func TestBookingHandler_CancelBooking(t *testing.T) {
 			mockService := &MockBookingService{
 				CancelBookingFunc: tt.mockFunc,
 			}
-			handler := NewBookingHandler(mockService)
+			handler := newTestBookingHandler(mockService)
 
 			var router *gin.Engine
 			if tt.userID != "" {
@@ -459,7 +468,7 @@ func TestBookingHandler_ReleaseBooking(t *testing.T) {
 			mockService := &MockBookingService{
 				ReleaseBookingFunc: tt.mockFunc,
 			}
-			handler := NewBookingHandler(mockService)
+			handler := newTestBookingHandler(mockService)
 
 			var router *gin.Engine
 			if tt.userID != "" {
@@ -540,7 +549,7 @@ func TestBookingHandler_GetBooking(t *testing.T) {
 			mockService := &MockBookingService{
 				GetBookingFunc: tt.mockFunc,
 			}
-			handler := NewBookingHandler(mockService)
+			handler := newTestBookingHandler(mockService)
 
 			var router *gin.Engine
 			if tt.userID != "" {
@@ -625,7 +634,7 @@ func TestBookingHandler_GetUserBookings(t *testing.T) {
 			mockService := &MockBookingService{
 				GetUserBookingsFunc: tt.mockFunc,
 			}
-			handler := NewBookingHandler(mockService)
+			handler := newTestBookingHandler(mockService)
 
 			var router *gin.Engine
 			if tt.userID != "" {
@@ -693,7 +702,7 @@ func TestBookingHandler_GetPendingBookings(t *testing.T) {
 			mockService := &MockBookingService{
 				GetPendingBookingsFunc: tt.mockFunc,
 			}
-			handler := NewBookingHandler(mockService)
+			handler := newTestBookingHandler(mockService)
 			router := setupTestRouterWithAuth(handler, "admin")
 
 			req := httptest.NewRequest(http.MethodGet, "/bookings/pending"+tt.query, nil)
@@ -778,7 +787,7 @@ func TestBookingHandler_HandleError(t *testing.T) {
 					return nil, tt.err
 				},
 			}
-			handler := NewBookingHandler(mockService)
+			handler := newTestBookingHandler(mockService)
 			router := setupTestRouterWithAuth(handler, "user-123")
 
 			req := httptest.NewRequest(http.MethodGet, "/bookings/test-id", nil)
@@ -803,7 +812,7 @@ func TestBookingHandler_HandleError(t *testing.T) {
 
 func TestBookingHandler_InvalidRequestBody(t *testing.T) {
 	mockService := &MockBookingService{}
-	handler := NewBookingHandler(mockService)
+	handler := newTestBookingHandler(mockService)
 	router := setupTestRouterWithAuth(handler, "user-123")
 
 	// Send invalid JSON

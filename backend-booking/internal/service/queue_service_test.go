@@ -105,6 +105,14 @@ func (m *MockQueueRepository) SetEventQueueConfig(ctx context.Context, eventID s
 	return args.Error(0)
 }
 
+func (m *MockQueueRepository) GetQueuePass(ctx context.Context, eventID, userID string) (string, error) {
+	args := m.Called(ctx, eventID, userID)
+	if args.Get(0) == nil {
+		return "", args.Error(1)
+	}
+	return args.String(0), args.Error(1)
+}
+
 // testJWTSecret is a constant secret used for testing only
 const testJWTSecret = "test-jwt-secret-for-unit-tests"
 
@@ -262,6 +270,7 @@ func TestQueueService_GetPosition_NotInQueue(t *testing.T) {
 	}
 
 	mockRepo.On("GetPosition", mock.Anything, "event-123", "user-123").Return(expectedResult, nil)
+	mockRepo.On("GetQueuePass", mock.Anything, "event-123", "user-123").Return("", nil) // No queue pass
 
 	result, err := service.GetPosition(context.Background(), "user-123", "event-123")
 
