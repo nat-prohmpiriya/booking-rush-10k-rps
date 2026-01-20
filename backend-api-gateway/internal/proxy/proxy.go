@@ -249,6 +249,9 @@ func (rp *ReverseProxy) Handler() gin.HandlerFunc {
 
 		span.SetStatus(codes.Ok, "")
 
+		// Debug log before proxy
+		fmt.Printf("[DEBUG] Proxying %s %s to %s\n", c.Request.Method, c.Request.URL.Path, route.Service.Name)
+
 		// Proxy the request with panic recovery
 		func() {
 			defer func() {
