@@ -31,6 +31,7 @@ export const bookingApi = {
   async confirmBooking(bookingId: string, data?: ConfirmBookingRequest): Promise<ConfirmBookingResponse> {
     const idempotencyKey = `confirm-${bookingId}-${Date.now()}`
     return apiClient.post<ConfirmBookingResponse>(`/bookings/${bookingId}/confirm`, data || {}, {
+      requireAuth: true,
       headers: { "X-Idempotency-Key": idempotencyKey }
     })
   },
