@@ -572,6 +572,19 @@ func (h *PaymentHandler) ConfirmPaymentIntent(c *gin.Context) {
 		return
 	}
 
+	// If payment is already succeeded (e.g., from webhook), skip processing
+	if payment.Status == domain.PaymentStatusSucceeded {
+		span.SetAttributes(attribute.String("status", string(payment.Status)))
+		span.SetStatus(codes.Ok, "payment already succeeded")
+		c.JSON(http.StatusOK, dto.NewSuccessResponse(map[string]interface{}{
+			"payment_id":        payment.ID,
+			"status":            payment.Status,
+			"payment_intent_id": req.PaymentIntentID,
+			"stripe_status":     intentResp.Status,
+		}))
+		return
+	}
+
 	// If Stripe says succeeded, process our payment
 	if intentResp.Status == "succeeded" {
 		processedPayment, err := h.paymentService.ProcessPayment(ctx, req.PaymentID)
