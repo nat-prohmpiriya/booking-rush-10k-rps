@@ -19,7 +19,7 @@ spec:
         - name: ghcr-secret
       containers:
         - name: frontend-web
-          image: ghcr.io/nat-prohmpiriya/booking-rush/frontend-web:29c70e9
+          image: ghcr.io/nat-prohmpiriya/booking-rush/frontend-web:ca03355
           imagePullPolicy: Always
           ports:
             - containerPort: 3000
