@@ -1,13 +1,13 @@
 "use client"
 
-import { Suspense, useEffect, useState } from "react"
+import { Suspense, useEffect, useState, useRef } from "react"
 import { useSearchParams } from "next/navigation"
 import { Check, Download, Wallet, Calendar, MapPin, Ticket, AlertTriangle, Loader2 } from "lucide-react"
 import { QRCodeSVG } from "qrcode.react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import Link from "next/link"
-import { bookingApi } from "@/lib/api/booking"
+import { bookingApi, paymentApi } from "@/lib/api/booking"
 import { eventsApi } from "@/lib/api/events"
 import type { BookingResponse, EventResponse, ShowResponse, ShowZoneResponse } from "@/lib/api/types"
 
@@ -44,13 +44,104 @@ function BookingConfirmationContent() {
   const searchParams = useSearchParams()
   const bookingId = searchParams.get("booking_id")
 
+  // Stripe 3D Secure redirect params
+  const paymentIntentParam = searchParams.get("payment_intent")
+  const redirectStatus = searchParams.get("redirect_status")
+
   const [showSuccess, setShowSuccess] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [bookingDetails, setBookingDetails] = useState<BookingDetails | null>(null)
 
+  // Prevent duplicate API calls
+  const isProcessingRef = useRef(false)
+
+  // Handle Stripe 3D Secure redirect
   useEffect(() => {
-    if (!bookingId) {
+    if (!paymentIntentParam || !redirectStatus) return
+    if (isProcessingRef.current) return
+
+    const handleStripeRedirect = async () => {
+      isProcessingRef.current = true
+
+      // Get payment data from sessionStorage (stored before redirect)
+      const pendingPaymentId = sessionStorage.getItem("pending_payment_id")
+      const pendingBookingId = sessionStorage.getItem("pending_booking_id")
+      const pendingPaymentIntentId = sessionStorage.getItem("pending_payment_intent_id")
+
+      if (!pendingPaymentId || !pendingBookingId) {
+        console.error("Missing payment data in sessionStorage")
+        setError("Payment session expired. Please try again.")
+        setLoading(false)
+        return
+      }
+
+      // Verify payment intent matches
+      if (pendingPaymentIntentId !== paymentIntentParam) {
+        console.error("Payment intent mismatch")
+        setError("Payment verification failed. Please contact support.")
+        setLoading(false)
+        return
+      }
+
+      if (redirectStatus === "succeeded") {
+        try {
+          // Confirm payment on backend
+          await paymentApi.confirmPaymentIntent({
+            payment_id: pendingPaymentId,
+            payment_intent_id: paymentIntentParam,
+          })
+
+          // Confirm booking
+          await bookingApi.confirmBooking(pendingBookingId, {
+            payment_id: pendingPaymentId,
+          })
+
+          // Clear pending payment data
+          sessionStorage.removeItem("pending_payment_id")
+          sessionStorage.removeItem("pending_booking_id")
+          sessionStorage.removeItem("pending_payment_intent_id")
+
+          // Clear queue session data
+          sessionStorage.removeItem("queue_token")
+          sessionStorage.removeItem("queue_event_id")
+          sessionStorage.removeItem("queue_show_id")
+          sessionStorage.removeItem("queue_tickets")
+          sessionStorage.removeItem("queue_total")
+          sessionStorage.removeItem("queue_pass")
+          sessionStorage.removeItem("queue_pass_expires_at")
+
+          // Redirect to clean URL with booking_id
+          window.history.replaceState({}, "", `/booking/confirmation?booking_id=${pendingBookingId}`)
+        } catch (err) {
+          console.error("Failed to confirm payment after 3D Secure:", err)
+          setError("Payment completed but confirmation failed. Please contact support.")
+          setLoading(false)
+          return
+        }
+      } else if (redirectStatus === "failed") {
+        setError("Payment failed. Please try again.")
+        setLoading(false)
+        return
+      }
+    }
+
+    handleStripeRedirect()
+  }, [paymentIntentParam, redirectStatus])
+
+  useEffect(() => {
+    // Wait for Stripe redirect handling if needed
+    if (paymentIntentParam && redirectStatus && !bookingId) {
+      // Get booking ID from sessionStorage while redirect is being processed
+      const pendingBookingId = sessionStorage.getItem("pending_booking_id")
+      if (pendingBookingId && !isProcessingRef.current) {
+        return // Wait for redirect handling
+      }
+    }
+
+    const actualBookingId = bookingId || sessionStorage.getItem("pending_booking_id")
+
+    if (!actualBookingId) {
       setError("No booking ID provided")
       setLoading(false)
       return
@@ -59,7 +150,7 @@ function BookingConfirmationContent() {
     const fetchBookingDetails = async () => {
       try {
         // Fetch booking
-        const booking = await bookingApi.getBooking(bookingId)
+        const booking = await bookingApi.getBooking(actualBookingId)
 
         // Fetch event details
         let event: EventResponse | null = null
@@ -104,7 +195,7 @@ function BookingConfirmationContent() {
     }
 
     fetchBookingDetails()
-  }, [bookingId])
+  }, [bookingId, paymentIntentParam, redirectStatus])
 
   // Format date
   const formatDate = (dateString: string) => {

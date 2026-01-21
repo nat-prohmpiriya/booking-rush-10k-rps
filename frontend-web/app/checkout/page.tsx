@@ -330,6 +330,12 @@ function CheckoutContent() {
         })
 
         setPaymentIntent(intentData)
+
+        // Store payment data in sessionStorage for 3D Secure redirect handling
+        sessionStorage.setItem("pending_payment_id", intentData.payment_id)
+        sessionStorage.setItem("pending_booking_id", reservation.booking_id)
+        sessionStorage.setItem("pending_payment_intent_id", intentData.payment_intent_id)
+
         setCheckoutState("ready")
       } catch (err) {
         console.error("Failed to create payment intent:", err)
